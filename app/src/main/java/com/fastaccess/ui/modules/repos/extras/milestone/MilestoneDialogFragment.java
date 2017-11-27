@@ -15,11 +15,13 @@ import com.fastaccess.data.dao.MilestoneModel;
 import com.fastaccess.helper.BundleConstant;
 import com.fastaccess.helper.Bundler;
 import com.fastaccess.ui.adapter.MilestonesAdapter;
+import com.fastaccess.ui.base.BaseDialogFragment;
 import com.fastaccess.ui.base.BaseFragment;
 import com.fastaccess.ui.modules.repos.extras.milestone.create.CreateMilestoneDialogFragment;
 import com.fastaccess.ui.widgets.AppbarRefreshLayout;
 import com.fastaccess.ui.widgets.StateLayout;
 import com.fastaccess.ui.widgets.recyclerview.DynamicRecyclerView;
+import com.fastaccess.ui.widgets.recyclerview.scroll.RecyclerViewFastScroller;
 
 import java.util.List;
 
@@ -37,6 +39,7 @@ public class MilestoneDialogFragment extends BaseFragment<MilestoneMvp.View, Mil
     @BindView(R.id.recycler) DynamicRecyclerView recycler;
     @BindView(R.id.refresh) AppbarRefreshLayout refresh;
     @BindView(R.id.stateLayout) StateLayout stateLayout;
+    @BindView(R.id.fastScroller) RecyclerViewFastScroller fastScroller;
     private MilestonesAdapter adapter;
     private MilestoneMvp.OnMilestoneSelected onMilestoneSelected;
 
@@ -76,6 +79,9 @@ public class MilestoneDialogFragment extends BaseFragment<MilestoneMvp.View, Mil
 
     @Override public void onMilestoneSelected(@NonNull MilestoneModel milestoneModel) {
         onMilestoneSelected.onMilestoneSelected(milestoneModel);
+        if (getParentFragment() instanceof BaseDialogFragment) {
+            ((BaseDialogFragment) getParentFragment()).dismiss();
+        }
     }
 
     @Override protected int fragmentLayout() {
@@ -102,14 +108,18 @@ public class MilestoneDialogFragment extends BaseFragment<MilestoneMvp.View, Mil
         adapter.setListener(getPresenter());
         recycler.setEmptyView(stateLayout, refresh);
         recycler.setAdapter(adapter);
+        recycler.addKeyLineDivider();
         if (savedInstanceState == null || (getPresenter().getMilestones().isEmpty() && !getPresenter().isApiCalled())) {
             getPresenter().onLoadMilestones(login, repo);
         }
         stateLayout.setOnReloadListener(v -> getPresenter().onLoadMilestones(login, repo));
         refresh.setOnRefreshListener(() -> getPresenter().onLoadMilestones(login, repo));
+        fastScroller.attachRecyclerView(recycler);
     }
 
     @Override public void showProgress(@StringRes int resId) {
+
+        refresh.setRefreshing(true);
         stateLayout.showProgress();
     }
 

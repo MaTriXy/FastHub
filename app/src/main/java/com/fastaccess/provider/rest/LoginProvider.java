@@ -5,8 +5,10 @@ import android.support.annotation.Nullable;
 
 import com.fastaccess.BuildConfig;
 import com.fastaccess.data.service.LoginRestService;
+import com.fastaccess.helper.InputHelper;
 import com.fastaccess.provider.rest.converters.GithubResponseConverter;
 import com.fastaccess.provider.rest.interceptors.AuthenticationInterceptor;
+import com.fastaccess.provider.scheme.LinkParserHelper;
 import com.google.gson.FieldNamingPolicy;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -16,7 +18,7 @@ import java.lang.reflect.Modifier;
 import okhttp3.OkHttpClient;
 import okhttp3.logging.HttpLoggingInterceptor;
 import retrofit2.Retrofit;
-import retrofit2.adapter.rxjava.RxJavaCallAdapterFactory;
+import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
 
 /**
  * Created by Kosh on 08 Feb 2017, 8:37 PM
@@ -41,12 +43,12 @@ public class LoginProvider {
         return client.build();
     }
 
-    private static Retrofit provideRetrofit(@Nullable String authToken, @Nullable String otp) {
+    private static Retrofit provideRetrofit(@Nullable String authToken, @Nullable String otp, @Nullable String enterpriseUrl) {
         return new Retrofit.Builder()
-                .baseUrl(BuildConfig.REST_URL)
+                .baseUrl(InputHelper.isEmpty(enterpriseUrl) ? BuildConfig.REST_URL : LinkParserHelper.getEndpoint(enterpriseUrl))
                 .client(provideOkHttpClient(authToken, otp))
                 .addConverterFactory(new GithubResponseConverter(gson))
-                .addCallAdapterFactory(RxJavaCallAdapterFactory.create())
+                .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
                 .build();
     }
 
@@ -55,12 +57,13 @@ public class LoginProvider {
                 .baseUrl("https://github.com/login/oauth/")
                 .client(provideOkHttpClient(null, null))
                 .addConverterFactory(new GithubResponseConverter(gson))
-                .addCallAdapterFactory(RxJavaCallAdapterFactory.create())
+                .addCallAdapterFactory(RxJava2CallAdapterFactory.create())
                 .build()
                 .create(LoginRestService.class);
     }
 
-    @NonNull public static LoginRestService getLoginRestService(@NonNull String authToken, @Nullable String otp) {
-        return provideRetrofit(authToken, otp).create(LoginRestService.class);
+    @NonNull public static LoginRestService getLoginRestService(@NonNull String authToken, @Nullable String otp,
+                                                                @Nullable String endpoint) {
+        return provideRetrofit(authToken, otp, endpoint).create(LoginRestService.class);
     }
 }

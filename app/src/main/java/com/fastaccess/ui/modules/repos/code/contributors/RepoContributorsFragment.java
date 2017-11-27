@@ -16,6 +16,7 @@ import com.fastaccess.ui.adapter.UsersAdapter;
 import com.fastaccess.ui.base.BaseFragment;
 import com.fastaccess.ui.widgets.StateLayout;
 import com.fastaccess.ui.widgets.recyclerview.DynamicRecyclerView;
+import com.fastaccess.ui.widgets.recyclerview.scroll.RecyclerViewFastScroller;
 
 import java.util.List;
 
@@ -30,6 +31,7 @@ public class RepoContributorsFragment extends BaseFragment<RepoContributorsMvp.V
     @BindView(R.id.recycler) DynamicRecyclerView recycler;
     @BindView(R.id.refresh) SwipeRefreshLayout refresh;
     @BindView(R.id.stateLayout) StateLayout stateLayout;
+    @BindView(R.id.fastScroller) RecyclerViewFastScroller fastScroller;
     private OnLoadMore onLoadMore;
     private UsersAdapter adapter;
 
@@ -67,9 +69,10 @@ public class RepoContributorsFragment extends BaseFragment<RepoContributorsMvp.V
         stateLayout.setOnReloadListener(this);
         refresh.setOnRefreshListener(this);
         recycler.setEmptyView(stateLayout, refresh);
+        recycler.addKeyLineDivider();
         adapter = new UsersAdapter(getPresenter().getUsers(), true);
         adapter.setListener(getPresenter());
-        getLoadMore().setCurrent_page(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
+        getLoadMore().initialize(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
         recycler.setAdapter(adapter);
         recycler.addOnScrollListener(getLoadMore());
         if (savedInstanceState == null) {
@@ -77,6 +80,7 @@ public class RepoContributorsFragment extends BaseFragment<RepoContributorsMvp.V
         } else if (getPresenter().getUsers().isEmpty() && !getPresenter().isApiCalled()) {
             onRefresh();
         }
+        fastScroller.attachRecyclerView(recycler);
     }
 
     @NonNull @Override public RepoContributorsPresenter providePresenter() {
@@ -84,6 +88,8 @@ public class RepoContributorsFragment extends BaseFragment<RepoContributorsMvp.V
     }
 
     @Override public void showProgress(@StringRes int resId) {
+
+        refresh.setRefreshing(true);
 
         stateLayout.showProgress();
     }
@@ -116,6 +122,11 @@ public class RepoContributorsFragment extends BaseFragment<RepoContributorsMvp.V
 
     @Override public void onClick(View view) {
         onRefresh();
+    }
+
+    @Override public void onScrollTop(int index) {
+        super.onScrollTop(index);
+        if (recycler != null) recycler.scrollToPosition(0);
     }
 
     private void showReload() {

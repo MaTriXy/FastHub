@@ -15,12 +15,14 @@ import com.fastaccess.helper.BundleConstant;
 import com.fastaccess.helper.Bundler;
 import com.fastaccess.provider.rest.loadmore.OnLoadMore;
 import com.fastaccess.provider.timeline.CommentsHelper;
+import com.fastaccess.provider.timeline.ReactionsProvider;
 import com.fastaccess.ui.adapter.UsersAdapter;
 import com.fastaccess.ui.base.BaseDialogFragment;
 import com.fastaccess.ui.widgets.AppbarRefreshLayout;
 import com.fastaccess.ui.widgets.SpannableBuilder;
 import com.fastaccess.ui.widgets.StateLayout;
 import com.fastaccess.ui.widgets.recyclerview.DynamicRecyclerView;
+import com.fastaccess.ui.widgets.recyclerview.scroll.RecyclerViewFastScroller;
 
 import java.util.List;
 
@@ -38,23 +40,19 @@ public class ReactionsDialogFragment extends BaseDialogFragment<ReactionsDialogM
     @BindView(R.id.recycler) DynamicRecyclerView recycler;
     @BindView(R.id.refresh) AppbarRefreshLayout refresh;
     @BindView(R.id.stateLayout) StateLayout stateLayout;
+    @BindView(R.id.fastScroller) RecyclerViewFastScroller fastScroller;
     private UsersAdapter adapter;
     private OnLoadMore onLoadMore;
 
     public static ReactionsDialogFragment newInstance(@NonNull String login, @NonNull String repoId,
-                                                      @NonNull ReactionTypes type, long idOrNumber, boolean isHeader) {
-        return newInstance(login, repoId, type, idOrNumber, isHeader, false);
-    }
-
-    public static ReactionsDialogFragment newInstance(@NonNull String login, @NonNull String repoId,
-                                                      @NonNull ReactionTypes type, long idOrNumber, boolean isHeader, boolean isCommit) {
+                                                      @NonNull ReactionTypes type, long idOrNumber,
+                                                      @ReactionsProvider.ReactionType int reactionType) {
         ReactionsDialogFragment view = new ReactionsDialogFragment();
         view.setArguments(Bundler.start()
                 .put(BundleConstant.EXTRA_TYPE, type)
                 .put(BundleConstant.EXTRA, repoId)
                 .put(BundleConstant.EXTRA_TWO, login)
-                .put(BundleConstant.EXTRA_THREE, isHeader)
-                .put(BundleConstant.EXTRA_FOUR, isCommit)
+                .put(BundleConstant.EXTRA_THREE, reactionType)
                 .put(BundleConstant.ID, idOrNumber)
                 .end());
         return view;
@@ -72,7 +70,7 @@ public class ReactionsDialogFragment extends BaseDialogFragment<ReactionsDialogM
         refresh.setOnRefreshListener(() -> getPresenter().onCallApi(1, null));
         recycler.setEmptyView(stateLayout, refresh);
         adapter = new UsersAdapter(getPresenter().getUsers());
-        getLoadMore().setCurrent_page(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
+        getLoadMore().initialize(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
         recycler.setAdapter(adapter);
         recycler.addOnScrollListener(getLoadMore());
         if (savedInstanceState == null) {
@@ -81,6 +79,7 @@ public class ReactionsDialogFragment extends BaseDialogFragment<ReactionsDialogM
         toolbar.setTitle(SpannableBuilder.builder().append(getString(R.string.reactions))
                 .append(" ")
                 .append(CommentsHelper.getEmoji(getPresenter().getReactionType())));
+        fastScroller.attachRecyclerView(recycler);
     }
 
     @Override public void onNotifyAdapter(@Nullable List<User> items, int page) {
@@ -97,6 +96,8 @@ public class ReactionsDialogFragment extends BaseDialogFragment<ReactionsDialogM
     }
 
     @Override public void showProgress(@StringRes int resId) {
+
+        refresh.setRefreshing(true);
         stateLayout.showProgress();
     }
 

@@ -20,10 +20,12 @@ import com.fastaccess.provider.rest.loadmore.OnLoadMore;
 import com.fastaccess.ui.adapter.IssuesAdapter;
 import com.fastaccess.ui.base.BaseFragment;
 import com.fastaccess.ui.modules.repos.RepoPagerMvp;
+import com.fastaccess.ui.modules.repos.extras.popup.IssuePopupFragment;
 import com.fastaccess.ui.modules.repos.issues.RepoIssuesPagerMvp;
 import com.fastaccess.ui.modules.repos.issues.issue.details.IssuePagerActivity;
 import com.fastaccess.ui.widgets.StateLayout;
 import com.fastaccess.ui.widgets.recyclerview.DynamicRecyclerView;
+import com.fastaccess.ui.widgets.recyclerview.scroll.RecyclerViewFastScroller;
 
 import java.util.List;
 
@@ -37,6 +39,7 @@ public class RepoClosedIssuesFragment extends BaseFragment<RepoIssuesMvp.View, R
     @BindView(R.id.recycler) DynamicRecyclerView recycler;
     @BindView(R.id.refresh) SwipeRefreshLayout refresh;
     @BindView(R.id.stateLayout) StateLayout stateLayout;
+    @BindView(R.id.fastScroller) RecyclerViewFastScroller fastScroller;
     private OnLoadMore<IssueState> onLoadMore;
     private IssuesAdapter adapter;
     private RepoPagerMvp.TabsBadgeListener tabsBadgeListener;
@@ -85,7 +88,7 @@ public class RepoClosedIssuesFragment extends BaseFragment<RepoIssuesMvp.View, R
     }
 
     @Override protected int fragmentLayout() {
-        return R.layout.small_grid_refresh_list;
+        return R.layout.micro_grid_refresh_list;
     }
 
     @Override protected void onFragmentCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
@@ -98,14 +101,16 @@ public class RepoClosedIssuesFragment extends BaseFragment<RepoIssuesMvp.View, R
         recycler.setEmptyView(stateLayout, refresh);
         adapter = new IssuesAdapter(getPresenter().getIssues(), true);
         adapter.setListener(getPresenter());
-        getLoadMore().setCurrent_page(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
+        getLoadMore().initialize(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
         recycler.setAdapter(adapter);
+        recycler.addKeyLineDivider();
         recycler.addOnScrollListener(getLoadMore());
         if (savedInstanceState == null) {
             getPresenter().onFragmentCreated(getArguments(), IssueState.closed);
         } else if (getPresenter().getIssues().isEmpty() && !getPresenter().isApiCalled()) {
             onRefresh();
         }
+        fastScroller.attachRecyclerView(recycler);
     }
 
     @NonNull @Override public RepoIssuesPresenter providePresenter() {
@@ -134,6 +139,8 @@ public class RepoClosedIssuesFragment extends BaseFragment<RepoIssuesMvp.View, R
     }
 
     @Override public void showProgress(@StringRes int resId) {
+
+        refresh.setRefreshing(true);
         stateLayout.showProgress();
     }
 
@@ -149,7 +156,12 @@ public class RepoClosedIssuesFragment extends BaseFragment<RepoIssuesMvp.View, R
 
     @NonNull @Override public OnLoadMore<IssueState> getLoadMore() {
         if (onLoadMore == null) {
-            onLoadMore = new OnLoadMore<>(getPresenter());
+            onLoadMore = new OnLoadMore<IssueState>(getPresenter()) {
+                @Override public void onScrolled(boolean isUp) {
+                    super.onScrolled(isUp);
+                    if (pagerCallback != null) pagerCallback.onScrolled(isUp);
+                }
+            };
         }
         onLoadMore.setParameter(IssueState.closed);
         return onLoadMore;
@@ -165,7 +177,16 @@ public class RepoClosedIssuesFragment extends BaseFragment<RepoIssuesMvp.View, R
 
     @Override public void onOpenIssue(@NonNull PullsIssuesParser parser) {
         startActivityForResult(IssuePagerActivity.createIntent(getContext(), parser.getRepoId(), parser.getLogin(),
-                parser.getNumber()), RepoIssuesMvp.ISSUE_REQUEST_CODE);
+                parser.getNumber(), false, isEnterprise()), RepoIssuesMvp.ISSUE_REQUEST_CODE);
+    }
+
+    @Override public void onRefresh(boolean isLastUpdated) {
+        getPresenter().onSetSortBy(isLastUpdated);
+        getPresenter().onCallApi(1, IssueState.closed);
+    }
+
+    @Override public void onShowIssuePopup(@NonNull Issue item) {
+        IssuePopupFragment.showPopup(getChildFragmentManager(), item);
     }
 
     @Override public void onRefresh() {
@@ -174,6 +195,11 @@ public class RepoClosedIssuesFragment extends BaseFragment<RepoIssuesMvp.View, R
 
     @Override public void onClick(View view) {
         onRefresh();
+    }
+
+    @Override public void onScrollTop(int index) {
+        super.onScrollTop(index);
+        if (recycler != null) recycler.scrollToPosition(0);
     }
 
     private void showReload() {

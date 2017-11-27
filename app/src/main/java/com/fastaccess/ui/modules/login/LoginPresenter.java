@@ -12,7 +12,6 @@ import com.fastaccess.data.dao.AuthModel;
 import com.fastaccess.data.dao.model.Login;
 import com.fastaccess.helper.GithubConfigHelper;
 import com.fastaccess.helper.InputHelper;
-import com.fastaccess.helper.Logger;
 import com.fastaccess.helper.PrefGetter;
 import com.fastaccess.provider.rest.LoginProvider;
 import com.fastaccess.provider.rest.RestProvider;
@@ -21,13 +20,21 @@ import com.fastaccess.ui.base.mvp.presenter.BasePresenter;
 import java.util.Arrays;
 
 import okhttp3.Credentials;
-import retrofit2.adapter.rxjava.HttpException;
+import retrofit2.HttpException;
 
 /**
  * Created by Kosh on 09 Nov 2016, 9:43 PM
  */
 
 public class LoginPresenter extends BasePresenter<LoginMvp.View> implements LoginMvp.Presenter {
+
+    LoginPresenter() {
+        RestProvider.clearHttpClient();
+    }
+
+    @Override protected void onDestroy() {
+        super.onDestroy();
+    }
 
     @Override public void onError(@NonNull Throwable throwable) {
         if (RestProvider.getErrorCode(throwable) == 401 && throwable instanceof HttpException) {
@@ -51,7 +58,7 @@ public class LoginPresenter extends BasePresenter<LoginMvp.View> implements Logi
             String token = modelResponse.getToken() != null ? modelResponse.getToken() : modelResponse.getAccessToken();
             if (!InputHelper.isEmpty(token)) {
                 PrefGetter.setToken(token);
-                makeRestCall(RestProvider.getUserService().getUser(), this::onUserResponse);
+                makeRestCall(RestProvider.getUserService(false).getUser(), this::onUserResponse);
                 return;
             }
         }
@@ -59,8 +66,7 @@ public class LoginPresenter extends BasePresenter<LoginMvp.View> implements Logi
     }
 
     @NonNull @Override public Uri getAuthorizationUrl() {
-        return new Uri.Builder()
-                .scheme("https")
+       return new Uri.Builder().scheme("https")
                 .authority("github.com")
                 .appendPath("login")
                 .appendPath("oauth")
@@ -73,15 +79,15 @@ public class LoginPresenter extends BasePresenter<LoginMvp.View> implements Logi
     }
 
     @Override public void onHandleAuthIntent(@Nullable Intent intent) {
-        Logger.e(intent, intent != null ? intent.getExtras() : "N/A");
         if (intent != null && intent.getData() != null) {
             Uri uri = intent.getData();
-            Logger.e(uri.toString());
             if (uri.toString().startsWith(GithubConfigHelper.getRedirectUrl())) {
                 String tokenCode = uri.getQueryParameter("code");
                 if (!InputHelper.isEmpty(tokenCode)) {
-                    makeRestCall(LoginProvider.getLoginRestService().getAccessToken(tokenCode, GithubConfigHelper.getClientId(),
-                            GithubConfigHelper.getSecret(), BuildConfig.APPLICATION_ID, GithubConfigHelper.getRedirectUrl()), this::onTokenResponse);
+                    makeRestCall(LoginProvider.getLoginRestService().getAccessToken(tokenCode,
+                            GithubConfigHelper.getClientId(), GithubConfigHelper.getSecret(),
+                            BuildConfig.APPLICATION_ID, GithubConfigHelper.getRedirectUrl()),
+                            this::onTokenResponse);
                 } else {
                     sendToView(view -> view.showMessage(R.string.error, R.string.error));
                 }
@@ -91,46 +97,58 @@ public class LoginPresenter extends BasePresenter<LoginMvp.View> implements Logi
 
     @Override public void onUserResponse(@Nullable Login userModel) {
         if (userModel != null) {
-            userModel.setToken(PrefGetter.getToken());
-            userModel.save(userModel);
-            sendToView(LoginMvp.View::onSuccessfullyLoggedIn);
+            manageObservable(Login.onMultipleLogin(userModel, isEnterprise(), true)
+                    .doOnComplete(() -> sendToView(view -> view.onSuccessfullyLoggedIn(isEnterprise()))));
             return;
         }
         sendToView(view -> view.showMessage(R.string.error, R.string.failed_login));
     }
 
-    @Override public void login(@NonNull String username, @NonNull String password, @Nullable String twoFactorCode, boolean isBasicAuth) {
+    @Override public void login(@NonNull String username, @NonNull String password, @Nullable String twoFactorCode,
+                                boolean isBasicAuth, @Nullable String endpoint) {
         boolean usernameIsEmpty = InputHelper.isEmpty(username);
         boolean passwordIsEmpty = InputHelper.isEmpty(password);
+        boolean endpointIsEmpty = InputHelper.isEmpty(endpoint) && isEnterprise();
         if (getView() == null) return;
         getView().onEmptyUserName(usernameIsEmpty);
         getView().onEmptyPassword(passwordIsEmpty);
-        if (!usernameIsEmpty && !passwordIsEmpty) {
+        getView().onEmptyEndpoint(endpointIsEmpty);
+        if ((!usernameIsEmpty && !passwordIsEmpty)) {
             String authToken = Credentials.basic(username, password);
-            if (isBasicAuth) {
+            if (isBasicAuth && !isEnterprise()) {
                 AuthModel authModel = new AuthModel();
                 authModel.setScopes(Arrays.asList("user", "repo", "gist", "notifications", "read:org"));
                 authModel.setNote(BuildConfig.APPLICATION_ID);
                 authModel.setClientSecret(GithubConfigHelper.getSecret());
                 authModel.setClientId(GithubConfigHelper.getClientId());
-                authModel.setNoteUr(GithubConfigHelper.getRedirectUrl());
+                authModel.setNoteUrl(GithubConfigHelper.getRedirectUrl());
                 if (!InputHelper.isEmpty(twoFactorCode)) {
                     authModel.setOtpCode(twoFactorCode);
                 }
-                makeRestCall(LoginProvider.getLoginRestService(authToken, twoFactorCode).login(authModel), accessTokenModel -> {
+                makeRestCall(LoginProvider.getLoginRestService(authToken, twoFactorCode, null).login(authModel), accessTokenModel -> {
                     if (!InputHelper.isEmpty(twoFactorCode)) {
                         PrefGetter.setOtpCode(twoFactorCode);
                     }
                     onTokenResponse(accessTokenModel);
                 });
             } else {
-                makeRestCall(LoginProvider.getLoginRestService(authToken, null).loginAccessToken(), login -> {
-                    if (login != null) {
-                        PrefGetter.setToken(InputHelper.toString(password));
+                accessTokenLogin(password, endpoint, twoFactorCode, authToken);
+            }
+        }
+    }
+
+    private void accessTokenLogin(@NonNull String password, @Nullable String endpoint, @Nullable String otp,
+                                  @NonNull String authToken) {
+        makeRestCall(LoginProvider.getLoginRestService(authToken, otp, endpoint).loginAccessToken(),
+                login -> {
+                    if (!isEnterprise()) {
+                        PrefGetter.setToken(password);
+                    } else {
+                        PrefGetter.setEnterpriseOtpCode(otp);
+                        PrefGetter.setTokenEnterprise(authToken);
+                        PrefGetter.setEnterpriseUrl(endpoint);
                     }
                     onUserResponse(login);
                 });
-            }
-        }
     }
 }

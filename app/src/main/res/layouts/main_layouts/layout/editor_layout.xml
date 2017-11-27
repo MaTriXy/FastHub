@@ -4,223 +4,88 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="?card_background"
     android:orientation="vertical">
 
     <include layout="@layout/appbar_elevation_dark"/>
 
     <ScrollView
+        android:id="@+id/parentView"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:clipToPadding="false"
         android:fillViewport="true">
 
-        <com.fastaccess.ui.widgets.FontEditText
-            android:id="@+id/editText"
+        <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@color/transparent"
-            android:gravity="top|start"
-            android:hint="@string/type_here"
-            android:inputType="textMultiLine|textCapSentences"
-            android:minLines="5"
-            android:padding="@dimen/spacing_xs_large"
-            android:scrollbars="vertical"
-            tools:ignore="ScrollViewSize"/>
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:id="@+id/replyQuote"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <com.fastaccess.ui.widgets.FontTextView
+                    android:id="@+id/replyQuoteText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:alpha="0.6"
+                    android:drawableEnd="@drawable/ic_arrow_drop_down"
+                    android:drawablePadding="@dimen/spacing_normal"
+                    android:maxLines="3"
+                    android:padding="@dimen/spacing_xs_large"
+                    android:textIsSelectable="true"
+                    tools:text="Lorem ipsum dolor sit amet, consectetur adipiscing elit. Maecenas quis sagittis purus. Cras pulvinar urna ut velit accumsan consectetur. Aenean mauris purus, rutrum eget luctus sit amet, efficitur vel mauris. Sed pulvinar nisl non ligula lacinia ultricies. Etiam quis purus sem. Morbi rutrum tristique ex sed commodo. Pellentesque volutpat laoreet urna et vestibulum. Vivamus id justo sed felis cursus venenatis id vitae felis. Praesent at condimentum erat. Vivamus vel est a dolor tincidunt porta. Mauris ut nisl tortor."/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="?dividerColor"/>
+            </LinearLayout>
+
+            <com.fastaccess.ui.widgets.markdown.MarkdownEditText
+                android:id="@+id/editText"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@color/transparent"
+                android:gravity="top|start"
+                android:hint="@string/type_here"
+                android:inputType="textMultiLine|textCapSentences"
+                android:minLines="5"
+                android:padding="@dimen/spacing_xs_large"
+                android:scrollbars="vertical"
+                tools:ignore="ScrollViewSize"/>
+
+        </LinearLayout>
 
     </ScrollView>
+
+    <View
+        android:id="@+id/list_divider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="?dividerColor"
+        android:visibility="gone"/>
+
+    <ListView
+        android:id="@+id/autocomplete"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:visibility="gone"/>
 
     <View
         android:layout_width="match_parent"
         android:layout_height="4dp"
         android:background="@drawable/toolbar_shadow_up"/>
 
-    <FrameLayout
+    <com.fastaccess.ui.widgets.markdown.MarkDownLayout
+        android:id="@+id/markDownLayout"
         android:layout_width="match_parent"
         android:layout_height="?actionBarSize"
-        android:orientation="horizontal">
-
-        <HorizontalScrollView
-            android:id="@+id/editorIconsHolder"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_marginEnd="@dimen/spacing_xlarge"
-            android:fadeScrollbars="true"
-            android:scrollbarFadeDuration="500"
-            android:scrollbarSize="1dp"
-            android:scrollbarStyle="outsideOverlay">
-
-            <LinearLayout
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="start|center"
-                android:gravity="center"
-                android:orientation="horizontal">
-
-                <com.fastaccess.ui.widgets.ForegroundImageView
-                    android:id="@+id/headerOne"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="?selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/header_one"
-                    android:padding="@dimen/spacing_normal"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_header_one"/>
-
-                <com.fastaccess.ui.widgets.ForegroundImageView
-                    android:id="@+id/headerTwo"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="?selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/header_two"
-                    android:padding="@dimen/spacing_normal"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_header_two"/>
-
-                <com.fastaccess.ui.widgets.ForegroundImageView
-                    android:id="@+id/headerThree"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="?selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/header_three"
-                    android:padding="@dimen/spacing_normal"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_header_three"/>
-
-                <com.fastaccess.ui.widgets.ForegroundImageView
-                    android:id="@+id/bold"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="?selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/bold"
-                    android:padding="@dimen/spacing_normal"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_format_bold"/>
-
-                <com.fastaccess.ui.widgets.ForegroundImageView
-                    android:id="@+id/italic"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="?selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/italic"
-                    android:padding="@dimen/spacing_normal"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_format_italic"/>
-
-                <com.fastaccess.ui.widgets.ForegroundImageView
-                    android:id="@+id/strikethrough"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="?selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/strike_through"
-                    android:padding="@dimen/spacing_normal"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_format_strikethrough"/>
-
-                <com.fastaccess.ui.widgets.ForegroundImageView
-                    android:id="@+id/bullet"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="?selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/bullet"
-                    android:padding="@dimen/spacing_normal"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_format_list_bulleted"/>
-
-                <com.fastaccess.ui.widgets.ForegroundImageView
-                    android:id="@+id/numbered"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="?selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/numbered_list"
-                    android:padding="@dimen/spacing_normal"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_list_numbers"/>
-
-                <com.fastaccess.ui.widgets.ForegroundImageView
-                    android:id="@+id/checkbox"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="?selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/numbered_list"
-                    android:padding="@dimen/spacing_normal"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_checkbox"/>
-
-                <com.fastaccess.ui.widgets.ForegroundImageView
-                    android:id="@+id/unCheckbox"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="?selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/numbered_list"
-                    android:padding="@dimen/spacing_normal"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_checkbox_empty"/>
-
-                <com.fastaccess.ui.widgets.ForegroundImageView
-                    android:id="@+id/header"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="?selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/header"
-                    android:padding="@dimen/spacing_normal"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_minus"/>
-
-                <com.fastaccess.ui.widgets.ForegroundImageView
-                    android:id="@+id/code"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="?selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/code"
-                    android:padding="@dimen/spacing_normal"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_code"/>
-
-                <com.fastaccess.ui.widgets.ForegroundImageView
-                    android:id="@+id/quote"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="?selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/quote"
-                    android:padding="@dimen/spacing_normal"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_format_quote"/>
-
-                <com.fastaccess.ui.widgets.ForegroundImageView
-                    android:id="@+id/link"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="?selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/link"
-                    android:padding="@dimen/spacing_normal"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_insert_link"/>
-
-                <com.fastaccess.ui.widgets.ForegroundImageView
-                    android:id="@+id/image"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:background="?selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/image"
-                    android:padding="@dimen/spacing_normal"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/ic_image"/>
-            </LinearLayout>
-
-        </HorizontalScrollView>
-
-        <com.fastaccess.ui.widgets.ForegroundImageView
-            android:id="@+id/view"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="end|center"
-            android:background="?selectableItemBackgroundBorderless"
-            android:contentDescription="@string/preview"
-            android:padding="@dimen/spacing_normal"
-            android:scaleType="centerCrop"
-            android:src="@drawable/ic_eye"/>
-    </FrameLayout>
+        android:orientation="horizontal"/>
 
     <include layout="@layout/add_banner_layout"/>
 </LinearLayout>

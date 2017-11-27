@@ -3,6 +3,7 @@ package com.fastaccess.helper;
 import android.Manifest;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
@@ -10,6 +11,7 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
+import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.customtabs.CustomTabsIntent;
@@ -22,7 +24,9 @@ import android.support.v4.util.Pair;
 import android.view.View;
 import android.widget.Toast;
 
+import com.fastaccess.App;
 import com.fastaccess.R;
+import com.fastaccess.ui.modules.parser.LinksParserActivity;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,18 +45,6 @@ public class ActivityHelper {
         return null;
     }
 
-    public static void login(@NonNull Activity activity, @NonNull Uri url) {
-        try {
-            Uri uri = Uri.parse("googlechrome://navigate?url=" + url);
-            Intent i = new Intent(Intent.ACTION_VIEW, uri);
-            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            activity.startActivity(i);
-        } catch (ActivityNotFoundException e) {
-            Toasty.info(activity, "Chrome is required to login").show();
-            e.printStackTrace();
-        }
-    }
-
     public static void startCustomTab(@NonNull Activity context, @NonNull Uri url) {
         String packageNameToUse = CustomTabsHelper.getPackageNameToUse(context);
         if (packageNameToUse != null) {
@@ -61,7 +53,11 @@ public class ActivityHelper {
                     .setShowTitle(true)
                     .build();
             customTabsIntent.intent.setPackage(packageNameToUse);
-            customTabsIntent.launchUrl(context, url);
+            try {
+                customTabsIntent.launchUrl(context, url);
+            } catch (ActivityNotFoundException ignored) {
+                openChooser(context, url, true);
+            }
         } else {
             openChooser(context, url, true);
         }
@@ -82,21 +78,24 @@ public class ActivityHelper {
         if (finalIntent != null) {
             try {
                 context.startActivity(finalIntent);
-            } catch (ActivityNotFoundException ignored) {}
+            } catch (ActivityNotFoundException ignored) {
+            }
         } else {
             if (!fromCustomTab) {
                 Activity activity = ActivityHelper.getActivity(context);
                 if (activity == null) {
                     try {
                         context.startActivity(i);
-                    } catch (ActivityNotFoundException ignored) {}
+                    } catch (ActivityNotFoundException ignored) {
+                    }
                     return;
                 }
                 startCustomTab(activity, url);
             } else {
                 try {
                     context.startActivity(i);
-                } catch (ActivityNotFoundException ignored) {}
+                } catch (ActivityNotFoundException ignored) {
+                }
             }
         }
     }
@@ -118,27 +117,40 @@ public class ActivityHelper {
     }
 
     public static void startReveal(@NonNull Activity activity, Intent intent, @NonNull View sharedElement, int requestCode) {
-        ActivityOptionsCompat options = ActivityOptionsCompat.makeClipRevealAnimation(sharedElement, sharedElement.getWidth() / 2,
-                sharedElement.getHeight() / 2,
-                sharedElement.getWidth(), sharedElement.getHeight());
-        activity.startActivityForResult(intent, requestCode, options.toBundle());
+        if (!PrefGetter.isAppAnimationDisabled()) {
+            ActivityOptionsCompat options = ActivityOptionsCompat.makeClipRevealAnimation(sharedElement, sharedElement.getWidth() / 2,
+                    sharedElement.getHeight() / 2,
+                    sharedElement.getWidth(), sharedElement.getHeight());
+            activity.startActivityForResult(intent, requestCode, options.toBundle());
+        } else {
+            activity.startActivityForResult(intent, requestCode);
+        }
     }
 
     public static void startReveal(@NonNull Fragment fragment, Intent intent, @NonNull View sharedElement, int requestCode) {
-        ActivityOptionsCompat options = ActivityOptionsCompat.makeClipRevealAnimation(sharedElement, sharedElement.getWidth() / 2,
-                sharedElement.getHeight() / 2,
-                sharedElement.getWidth(), sharedElement.getHeight());
-        fragment.startActivityForResult(intent, requestCode, options.toBundle());
+        if (!PrefGetter.isAppAnimationDisabled()) {
+            ActivityOptionsCompat options = ActivityOptionsCompat.makeClipRevealAnimation(sharedElement, sharedElement.getWidth() / 2,
+                    sharedElement.getHeight() / 2,
+                    sharedElement.getWidth(), sharedElement.getHeight());
+            fragment.startActivityForResult(intent, requestCode, options.toBundle());
+        } else {
+            fragment.startActivityForResult(intent, requestCode);
+        }
     }
 
     public static void startReveal(@NonNull Activity activity, Intent intent, @NonNull View sharedElement) {
-        ActivityOptionsCompat options = ActivityOptionsCompat.makeClipRevealAnimation(sharedElement, sharedElement.getWidth() / 2,
-                sharedElement.getHeight() / 2,
-                sharedElement.getWidth(), sharedElement.getHeight());
-        activity.startActivity(intent, options.toBundle());
+        if (!PrefGetter.isAppAnimationDisabled()) {
+            ActivityOptionsCompat options = ActivityOptionsCompat.makeClipRevealAnimation(sharedElement, sharedElement.getWidth() / 2,
+                    sharedElement.getHeight() / 2,
+                    sharedElement.getWidth(), sharedElement.getHeight());
+            activity.startActivity(intent, options.toBundle());
+        } else {
+            activity.startActivity(intent);
+        }
     }
 
-    @SafeVarargs public static void start(@NonNull Activity activity, @NonNull Intent intent, @NonNull Pair<View, String>... sharedElements) {
+    @SafeVarargs public static void start(@NonNull Activity activity, @NonNull Intent intent,
+                                          @NonNull Pair<View, String>... sharedElements) {
         ActivityOptionsCompat options = ActivityOptionsCompat.makeSceneTransitionAnimation(activity, sharedElements);
         activity.startActivity(intent, options.toBundle());
 
@@ -150,11 +162,11 @@ public class ActivityHelper {
         try {
             ShareCompat.IntentBuilder.from(activity)
                     .setChooserTitle(context.getString(R.string.share))
-                    .setType("text/*")
+                    .setType("text/plain")
                     .setText(url)
                     .startChooser();
         } catch (ActivityNotFoundException e) {
-            Toasty.error(context, e.getMessage(), Toast.LENGTH_LONG).show();
+            Toasty.error(App.getInstance(), e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
 
@@ -197,7 +209,7 @@ public class ActivityHelper {
             return false;
         } else if (isExplanationNeeded(activity, Manifest.permission.READ_EXTERNAL_STORAGE)
                 || isExplanationNeeded(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
-            Toasty.error(activity, activity.getString(R.string.read_write_permission_explanation), Toast.LENGTH_LONG).show();
+            Toasty.error(App.getInstance(), activity.getString(R.string.read_write_permission_explanation), Toast.LENGTH_LONG).show();
             return false;
         }
         return true;
@@ -233,5 +245,19 @@ public class ActivityHelper {
         return chooserIntent;
     }
 
+    public static void activateLinkInterceptorActivity(Context context, boolean activate) {
+        final PackageManager pm = context.getPackageManager();
+        final int flag = activate ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED : PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
+        pm.setComponentEnabledSetting(new ComponentName(context, LinksParserActivity.class), flag, PackageManager.DONT_KILL_APP);
+    }
+
+    public static Intent editBundle(@NonNull Intent intent, boolean isEnterprise) {
+        Bundle bundle = intent.getExtras();
+        if (bundle != null) {
+            bundle.putBoolean(BundleConstant.IS_ENTERPRISE, isEnterprise);
+            intent.putExtras(bundle);
+        }
+        return intent;
+    }
 
 }

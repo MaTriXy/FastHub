@@ -4,11 +4,13 @@ import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.design.widget.TabLayout;
+import android.support.v4.app.Fragment;
 import android.view.View;
 import android.widget.TextView;
 
 import com.annimon.stream.Objects;
 import com.annimon.stream.Stream;
+import com.evernote.android.state.State;
 import com.fastaccess.R;
 import com.fastaccess.data.dao.FragmentPagerAdapterModel;
 import com.fastaccess.data.dao.TabsCountStateModel;
@@ -25,7 +27,6 @@ import com.fastaccess.ui.widgets.ViewPagerView;
 import java.util.HashSet;
 
 import butterknife.BindView;
-import icepick.State;
 
 /**
  * Created by Kosh on 31 Dec 2016, 1:36 AM
@@ -39,13 +40,14 @@ public class RepoCodePagerFragment extends BaseFragment<RepoCodePagerMvp.View, R
     @State HashSet<TabsCountStateModel> counts = new HashSet<>();
 
     public static RepoCodePagerFragment newInstance(@NonNull String repoId, @NonNull String login,
-                                                    @NonNull String htmlLink, @NonNull String defaultBranch) {
+                                                    @NonNull String htmlLink, @NonNull String url, @NonNull String defaultBranch) {
         RepoCodePagerFragment view = new RepoCodePagerFragment();
         view.setArguments(Bundler.start()
                 .put(BundleConstant.ID, repoId)
                 .put(BundleConstant.EXTRA, login)
-                .put(BundleConstant.EXTRA_TWO, htmlLink)
+                .put(BundleConstant.EXTRA_TWO, url)
                 .put(BundleConstant.EXTRA_THREE, defaultBranch)
+                .put(BundleConstant.EXTRA_FOUR, htmlLink)
                 .end());
         return view;
     }
@@ -58,19 +60,34 @@ public class RepoCodePagerFragment extends BaseFragment<RepoCodePagerMvp.View, R
         if (getArguments() != null) {
             String repoId = getArguments().getString(BundleConstant.ID);
             String login = getArguments().getString(BundleConstant.EXTRA);
-            String htmlLink = getArguments().getString(BundleConstant.EXTRA_TWO);
+            String url = getArguments().getString(BundleConstant.EXTRA_TWO);
+            String htmlUrl = getArguments().getString(BundleConstant.EXTRA_FOUR);
             String defaultBranch = getArguments().getString(BundleConstant.EXTRA_THREE);
-            if (InputHelper.isEmpty(repoId) || InputHelper.isEmpty(login) || InputHelper.isEmpty(htmlLink)) {
-                throw new NullPointerException();
+            if (InputHelper.isEmpty(repoId) || InputHelper.isEmpty(login) || InputHelper.isEmpty(url) || InputHelper.isEmpty(htmlUrl)) {
+                return;
             }
             pager.setAdapter(new FragmentsPagerAdapter(getChildFragmentManager(),
-                    FragmentPagerAdapterModel.buildForRepoCode(getContext(), repoId, login, htmlLink,
-                            Objects.toString(defaultBranch, "master"))));
+                    FragmentPagerAdapterModel.buildForRepoCode(getContext(), repoId, login, url,
+                            Objects.toString(defaultBranch, "master"), htmlUrl)));
             tabs.setTabMode(TabLayout.MODE_SCROLLABLE);
             tabs.setupWithViewPager(pager);
         }
         if (savedInstanceState != null && !counts.isEmpty()) {
             Stream.of(counts).forEach(this::updateCount);
+        }
+        tabs.addOnTabSelectedListener(new TabLayout.ViewPagerOnTabSelectedListener(pager) {
+            @Override public void onTabReselected(TabLayout.Tab tab) {
+                super.onTabReselected(tab);
+                onScrollTop(tab.getPosition());
+            }
+        });
+    }
+
+    @Override public void onScrollTop(int index) {
+        if (pager == null || pager.getAdapter() == null) return;
+        Fragment fragment = (BaseFragment) pager.getAdapter().instantiateItem(pager, index);
+        if (fragment instanceof BaseFragment) {
+            ((BaseFragment) fragment).onScrollTop(index);
         }
     }
 

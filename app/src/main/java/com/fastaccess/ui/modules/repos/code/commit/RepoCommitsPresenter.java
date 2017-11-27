@@ -6,9 +6,7 @@ import android.support.annotation.Nullable;
 import android.text.TextUtils;
 import android.view.View;
 
-import com.annimon.stream.Collectors;
-import com.annimon.stream.Stream;
-import com.fastaccess.data.dao.BranchesModel;
+import com.fastaccess.data.dao.Pageable;
 import com.fastaccess.data.dao.model.Commit;
 import com.fastaccess.helper.BundleConstant;
 import com.fastaccess.helper.InputHelper;
@@ -19,9 +17,8 @@ import com.fastaccess.ui.base.mvp.presenter.BasePresenter;
 import com.fastaccess.ui.modules.repos.code.commit.details.CommitPagerActivity;
 
 import java.util.ArrayList;
-import java.util.List;
 
-import rx.Observable;
+import io.reactivex.Observable;
 
 /**
  * Created by Kosh on 03 Dec 2016, 3:48 PM
@@ -30,10 +27,10 @@ import rx.Observable;
 class RepoCommitsPresenter extends BasePresenter<RepoCommitsMvp.View> implements RepoCommitsMvp.Presenter {
 
     private ArrayList<Commit> commits = new ArrayList<>();
-    private ArrayList<BranchesModel> branches = new ArrayList<>();
-    private String login;
-    private String repoId;
-    private String branch;
+    @com.evernote.android.state.State String login;
+    @com.evernote.android.state.State String repoId;
+    @com.evernote.android.state.State String branch;
+    @com.evernote.android.state.State String path;
     private int page;
     private int previousTotal;
     private int lastPage = Integer.MAX_VALUE;
@@ -59,7 +56,7 @@ class RepoCommitsPresenter extends BasePresenter<RepoCommitsMvp.View> implements
         super.onError(throwable);
     }
 
-    @Override public void onCallApi(int page, @Nullable Object parameter) {
+    @Override public boolean onCallApi(int page, @Nullable Object parameter) {
         if (page == 1) {
             lastPage = Integer.MAX_VALUE;
             sendToView(view -> view.getLoadMore().reset());
@@ -67,88 +64,44 @@ class RepoCommitsPresenter extends BasePresenter<RepoCommitsMvp.View> implements
         setCurrentPage(page);
         if (page > lastPage || lastPage == 0) {
             sendToView(RepoCommitsMvp.View::hideProgress);
-            return;
+            return false;
         }
-        if (repoId == null || login == null) return;
-        makeRestCall(RestProvider.getRepoService().getCommits(login, repoId, branch, page),
-                response -> {
-                    if (response != null && response.getItems() != null) {
-                        lastPage = response.getLast();
-                        if (getCurrentPage() == 1) {
-                            manageSubscription(Commit.save(response.getItems(), repoId, login).subscribe());
-                        }
-                    }
-                    sendToView(view -> view.onNotifyAdapter(response != null ? response.getItems() : null, page));
-                });
+        if (repoId == null || login == null) return false;
+        Observable<Pageable<Commit>> observable = InputHelper.isEmpty(path)
+                                                  ? RestProvider.getRepoService(isEnterprise()).getCommits(login, repoId, branch, page)
+                                                  : RestProvider.getRepoService(isEnterprise()).getCommits(login, repoId, branch, path, page);
+        makeRestCall(observable, response -> {
+            if (response != null && response.getItems() != null) {
+                lastPage = response.getLast();
+                if (getCurrentPage() == 1) {
+                    manageDisposable(Commit.save(response.getItems(), repoId, login));
+                }
+            }
+            sendToView(view -> view.onNotifyAdapter(response != null ? response.getItems() : null, page));
+        });
+        return true;
     }
 
     @Override public void onFragmentCreated(@NonNull Bundle bundle) {
         repoId = bundle.getString(BundleConstant.ID);
         login = bundle.getString(BundleConstant.EXTRA);
         branch = bundle.getString(BundleConstant.EXTRA_TWO);
-        if (branches.isEmpty()) {
+        path = bundle.getString(BundleConstant.EXTRA_THREE);
+        if (!InputHelper.isEmpty(branch)) {
             getCommitCount(branch);
-            Observable<List<BranchesModel>> observable = RxHelper.getObserver(Observable.zip(
-                    RestProvider.getRepoService().getBranches(login, repoId),
-                    RestProvider.getRepoService().getTags(login, repoId),
-                    (branchPageable, tags) -> {
-                        ArrayList<BranchesModel> branchesModels = new ArrayList<>();
-                        if (branchPageable.getItems() != null) {
-                            branchesModels.addAll(Stream.of(branchPageable.getItems())
-                                    .map(branchesModel -> {
-                                        branchesModel.setTag(false);
-                                        return branchesModel;
-                                    }).collect(Collectors.toList()));
-                        }
-                        if (tags != null) {
-                            branchesModels.addAll(Stream.of(tags.getItems())
-                                    .map(branchesModel -> {
-                                        branchesModel.setTag(true);
-                                        return branchesModel;
-                                    }).collect(Collectors.toList()));
-
-                        }
-                        return branchesModels;
-                    }));
-            manageSubscription(observable
-                    .doOnSubscribe(() -> sendToView(RepoCommitsMvp.View::showBranchesProgress))
-                    .doOnNext(branchesModels -> {
-                        branches.clear();
-                        branches.addAll(branchesModels);
-                        sendToView(view -> view.setBranchesData(branches, true));
-                    })
-                    .onErrorReturn(throwable -> {
-                        sendToView(view -> view.setBranchesData(branches, true));
-                        return null;
-                    })
-                    .subscribe());
         }
         if (!InputHelper.isEmpty(login) && !InputHelper.isEmpty(repoId)) {
             onCallApi(1, null);
         }
     }
 
-    private void getCommitCount(@NonNull String branch) {
-        manageSubscription(RxHelper.safeObservable(RxHelper.getObserver(RestProvider.getRepoService()
-                .getCommitCounts(login, repoId, branch)))
-                .subscribe(response -> {
-                    if (response != null) {
-                        sendToView(view -> view.onShowCommitCount(response.getLast()));
-                    }
-                }));
-    }
-
     @NonNull @Override public ArrayList<Commit> getCommits() {
         return commits;
     }
 
-    @NonNull @Override public ArrayList<BranchesModel> getBranches() {
-        return branches;
-    }
-
     @Override public void onWorkOffline() {
         if (commits.isEmpty()) {
-            manageSubscription(RxHelper.getObserver(Commit.getCommits(repoId, login))
+            manageDisposable(RxHelper.getObservable(Commit.getCommits(repoId, login).toObservable())
                     .subscribe(models -> sendToView(view -> view.onNotifyAdapter(models, 1))));
         } else {
             sendToView(BaseMvp.FAView::hideProgress);
@@ -171,7 +124,15 @@ class RepoCommitsPresenter extends BasePresenter<RepoCommitsMvp.View> implements
         CommitPagerActivity.createIntentForOffline(v.getContext(), item);
     }
 
-    @Override public void onItemLongClick(int position, View v, Commit item) {
-        onItemClick(position, v, item);
+    @Override public void onItemLongClick(int position, View v, Commit item) {}
+
+    private void getCommitCount(@NonNull String branch) {
+        manageDisposable(RxHelper.safeObservable(RxHelper.getObservable(RestProvider.getRepoService(isEnterprise())
+                .getCommitCounts(login, repoId, branch)))
+                .subscribe(response -> {
+                    if (response != null) {
+                        sendToView(view -> view.onShowCommitCount(response.getLast()));
+                    }
+                }, Throwable::printStackTrace));
     }
 }

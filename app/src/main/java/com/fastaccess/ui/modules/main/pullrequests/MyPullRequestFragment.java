@@ -6,9 +6,9 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.annotation.StringRes;
 import android.support.v4.widget.SwipeRefreshLayout;
-import android.support.v7.widget.RecyclerView;
 import android.view.View;
 
+import com.evernote.android.state.State;
 import com.fastaccess.R;
 import com.fastaccess.data.dao.model.PullRequest;
 import com.fastaccess.data.dao.types.IssueState;
@@ -19,13 +19,14 @@ import com.fastaccess.provider.rest.loadmore.OnLoadMore;
 import com.fastaccess.ui.adapter.PullRequestAdapter;
 import com.fastaccess.ui.base.BaseFragment;
 import com.fastaccess.ui.modules.repos.RepoPagerMvp;
+import com.fastaccess.ui.modules.repos.extras.popup.IssuePopupFragment;
 import com.fastaccess.ui.widgets.StateLayout;
 import com.fastaccess.ui.widgets.recyclerview.DynamicRecyclerView;
+import com.fastaccess.ui.widgets.recyclerview.scroll.RecyclerViewFastScroller;
 
 import java.util.List;
 
 import butterknife.BindView;
-import icepick.State;
 
 /**
  * Created by Kosh on 25 Mar 2017, 11:48 PM
@@ -36,6 +37,7 @@ public class MyPullRequestFragment extends BaseFragment<MyPullRequestsMvp.View, 
     @BindView(R.id.recycler) DynamicRecyclerView recycler;
     @BindView(R.id.refresh) SwipeRefreshLayout refresh;
     @BindView(R.id.stateLayout) StateLayout stateLayout;
+    @BindView(R.id.fastScroller) RecyclerViewFastScroller fastScroller;
     @State IssueState issueState;
     private OnLoadMore<IssueState> onLoadMore;
     private PullRequestAdapter adapter;
@@ -91,6 +93,8 @@ public class MyPullRequestFragment extends BaseFragment<MyPullRequestsMvp.View, 
     }
 
     @Override public void showProgress(@StringRes int resId) {
+
+        refresh.setRefreshing(true);
         stateLayout.showProgress();
     }
 
@@ -106,15 +110,7 @@ public class MyPullRequestFragment extends BaseFragment<MyPullRequestsMvp.View, 
 
     @NonNull @Override public OnLoadMore<IssueState> getLoadMore() {
         if (onLoadMore == null) {
-            onLoadMore = new OnLoadMore<IssueState>(getPresenter()) {
-                @Override protected void onShow(RecyclerView recyclerView) {
-                    super.onShow(recyclerView);
-                }
-
-                @Override protected void onHide(RecyclerView recyclerView) {
-                    super.onHide(recyclerView);
-                }
-            };
+            onLoadMore = new OnLoadMore<>(getPresenter());
         }
         onLoadMore.setParameter(issueState);
         return onLoadMore;
@@ -140,7 +136,7 @@ public class MyPullRequestFragment extends BaseFragment<MyPullRequestsMvp.View, 
     }
 
     @Override protected int fragmentLayout() {
-        return R.layout.small_grid_refresh_list;
+        return R.layout.micro_grid_refresh_list;
     }
 
     @Override protected void onFragmentCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
@@ -153,14 +149,15 @@ public class MyPullRequestFragment extends BaseFragment<MyPullRequestsMvp.View, 
         refresh.setOnRefreshListener(this);
         adapter = new PullRequestAdapter(getPresenter().getPullRequests(), false, true);
         adapter.setListener(getPresenter());
-        recycler.addDivider();
-        getLoadMore().setCurrent_page(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
+        getLoadMore().initialize(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
         recycler.setAdapter(adapter);
+        recycler.addDivider();
         recycler.addOnScrollListener(getLoadMore());
         if (savedInstanceState == null || (getPresenter().getPullRequests().isEmpty() && !getPresenter().isApiCalled())) {
             onRefresh();
         }
         stateLayout.setEmptyText(getString(R.string.no) + " " + getString(R.string.pull_requests));
+        fastScroller.attachRecyclerView(recycler);
     }
 
     @NonNull @Override public MyPullRequestsPresenter providePresenter() {
@@ -175,6 +172,15 @@ public class MyPullRequestFragment extends BaseFragment<MyPullRequestsMvp.View, 
             adapter.clear();
             onRefresh();
         }
+    }
+
+    @Override public void onScrollTop(int index) {
+        super.onScrollTop(index);
+        if (recycler != null) recycler.scrollToPosition(0);
+    }
+
+    @Override public void onShowPopupDetails(@NonNull PullRequest item) {
+        IssuePopupFragment.showPopup(getChildFragmentManager(), item);
     }
 
     private void showReload() {

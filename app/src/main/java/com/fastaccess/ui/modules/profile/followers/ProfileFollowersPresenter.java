@@ -47,7 +47,7 @@ class ProfileFollowersPresenter extends BasePresenter<ProfileFollowersMvp.View> 
         super.onError(throwable);
     }
 
-    @Override public void onCallApi(int page, @Nullable String parameter) {
+    @Override public boolean onCallApi(int page, @Nullable String parameter) {
         if (parameter == null) {
             throw new NullPointerException("Username is null");
         }
@@ -58,16 +58,17 @@ class ProfileFollowersPresenter extends BasePresenter<ProfileFollowersMvp.View> 
         setCurrentPage(page);
         if (page > lastPage || lastPage == 0) {
             sendToView(ProfileFollowersMvp.View::hideProgress);
-            return;
+            return false;
         }
-        makeRestCall(RestProvider.getUserService().getFollowers(parameter, page),
+        makeRestCall(RestProvider.getUserService(isEnterprise()).getFollowers(parameter, page),
                 response -> {
                     lastPage = response.getLast();
                     if (getCurrentPage() == 1) {
-                        manageSubscription(User.saveUserFollowerList(response.getItems(), parameter).subscribe());
+                        manageDisposable(User.saveUserFollowerList(response.getItems(), parameter));
                     }
                     sendToView(view -> view.onNotifyAdapter(response.getItems(), page));
                 });
+        return true;
     }
 
     @NonNull @Override public ArrayList<User> getFollowers() {
@@ -76,7 +77,7 @@ class ProfileFollowersPresenter extends BasePresenter<ProfileFollowersMvp.View> 
 
     @Override public void onWorkOffline(@NonNull String login) {
         if (users.isEmpty()) {
-            manageSubscription(RxHelper.getObserver(User.getUserFollowerList(login)).subscribe(userModels ->
+            manageDisposable(RxHelper.getSingle(User.getUserFollowerList(login)).subscribe(userModels ->
                     sendToView(view -> view.onNotifyAdapter(userModels, 1))));
         } else {
             sendToView(ProfileFollowersMvp.View::hideProgress);

@@ -5,6 +5,7 @@ import android.os.Parcelable;
 import android.support.annotation.NonNull;
 
 import com.fastaccess.App;
+import com.fastaccess.data.dao.ReactionsModel;
 import com.fastaccess.data.dao.converters.ReactionsConverter;
 import com.fastaccess.data.dao.converters.UserConverter;
 import com.fastaccess.helper.RxHelper;
@@ -12,15 +13,15 @@ import com.fastaccess.helper.RxHelper;
 import java.util.Date;
 import java.util.List;
 
+import io.reactivex.Single;
+import io.reactivex.disposables.Disposable;
+import io.requery.BlockingEntityStore;
 import io.requery.Column;
 import io.requery.Convert;
 import io.requery.Entity;
 import io.requery.Key;
 import io.requery.Persistable;
-import io.requery.rx.SingleEntityStore;
 import lombok.NoArgsConstructor;
-import rx.Observable;
-import rx.Single;
 
 import static com.fastaccess.data.dao.model.Comment.COMMIT_ID;
 import static com.fastaccess.data.dao.model.Comment.GIST_ID;
@@ -53,61 +54,71 @@ import static com.fastaccess.data.dao.model.Comment.UPDATED_AT;
     String issueId;
     String pullRequestId;
     @Convert(ReactionsConverter.class) ReactionsModel reactions;
+    String authorAssociation;
 
-    public Single save(Comment modelEntity) {
-        return App.getInstance().getDataStore()
-                .delete(Comment.class)
-                .where(ID.eq(modelEntity.getId()))
-                .get()
-                .toSingle()
-                .flatMap(integer -> App.getInstance().getDataStore().insert(modelEntity));
+    public static Disposable saveForGist(@NonNull List<Comment> models, @NonNull String gistId) {
+        return RxHelper.getSingle(Single.fromPublisher(s -> {
+            try {
+                BlockingEntityStore<Persistable> dataSource = App.getInstance().getDataStore().toBlocking();
+                dataSource.delete(Comment.class)
+                        .where(GIST_ID.equal(gistId))
+                        .get()
+                        .value();
+                if (!models.isEmpty()) {
+                    for (Comment model : models) {
+                        dataSource.delete(Comment.class).where(ID.eq(model.getId())).get().value();
+                        model.setGistId(gistId);
+                        dataSource.insert(model);
+                    }
+                }
+                s.onNext("");
+            } catch (Exception e) {
+                s.onError(e);
+            }
+            s.onComplete();
+        })).subscribe(o -> {/*donothing*/}, Throwable::printStackTrace);
     }
 
-    public static Observable saveForGist(@NonNull List<Comment> models, @NonNull String gistId) {
-        SingleEntityStore<Persistable> singleEntityStore = App.getInstance().getDataStore();
-        return RxHelper.safeObservable(singleEntityStore.delete(Comment.class)
-                .where(GIST_ID.equal(gistId))
-                .get()
-                .toSingle()
-                .toObservable()
-                .flatMap(integer -> Observable.from(models))
-                .flatMap(comment -> {
-                    comment.setGistId(gistId);
-                    return singleEntityStore.insert(comment).toObservable();
-                }));
-    }
-
-    public static Observable saveForCommits(@NonNull List<Comment> models, @NonNull String repoId,
+    public static Disposable saveForCommits(@NonNull List<Comment> models, @NonNull String repoId,
                                             @NonNull String login, @NonNull String commitId) {
-        SingleEntityStore<Persistable> singleEntityStore = App.getInstance().getDataStore();
-        return RxHelper.safeObservable(singleEntityStore.delete(Comment.class)
-                .where(COMMIT_ID.equal(commitId)
-                        .and(REPO_ID.equal(repoId))
-                        .and(LOGIN.equal(login)))
-                .get()
-                .toSingle()
-                .toObservable()
-                .flatMap(integer -> Observable.from(models))
-                .flatMap(model -> {
-                    model.setLogin(login);
-                    model.setRepoId(repoId);
-                    model.setCommitId(commitId);
-                    return singleEntityStore.insert(model).toObservable();
-                }));
+        return RxHelper.getSingle(Single.fromPublisher(s -> {
+            try {
+                BlockingEntityStore<Persistable> dataSource = App.getInstance().getDataStore().toBlocking();
+                dataSource.delete(Comment.class)
+                        .where(COMMIT_ID.equal(commitId)
+                                .and(REPO_ID.equal(repoId))
+                                .and(LOGIN.equal(login)))
+                        .get()
+                        .value();
+                if (!models.isEmpty()) {
+                    for (Comment model : models) {
+                        dataSource.delete(Comment.class).where(ID.eq(model.getId())).get().value();
+                        model.setLogin(login);
+                        model.setRepoId(repoId);
+                        model.setCommitId(commitId);
+                        dataSource.insert(model);
+                    }
+                }
+                s.onNext("");
+            } catch (Exception e) {
+                s.onError(e);
+            }
+            s.onComplete();
+        })).subscribe(o -> {/*donothing*/}, Throwable::printStackTrace);
     }
 
-    public static Observable<List<Comment>> getGistComments(@NonNull String gistId) {
+    public static Single<List<Comment>> getGistComments(@NonNull String gistId) {
         return App.getInstance().getDataStore()
                 .select(Comment.class)
                 .where(GIST_ID.equal(gistId))
                 .orderBy(UPDATED_AT.desc())
                 .get()
-                .toObservable()
+                .observable()
                 .toList();
     }
 
-    public static Observable<List<Comment>> getCommitComments(@NonNull String repoId, @NonNull String login,
-                                                              @NonNull String commitId) {
+    public static Single<List<Comment>> getCommitComments(@NonNull String repoId, @NonNull String login,
+                                                          @NonNull String commitId) {
         return App.getInstance().getDataStore()
                 .select(Comment.class)
                 .where(REPO_ID.equal(repoId)
@@ -115,12 +126,11 @@ import static com.fastaccess.data.dao.model.Comment.UPDATED_AT;
                         .and(COMMIT_ID.equal(commitId)))
                 .orderBy(UPDATED_AT.desc())
                 .get()
-                .toObservable()
+                .observable()
                 .toList();
     }
 
-    public static Observable<List<Comment>> getIssueComments(@NonNull String repoId, @NonNull String login,
-                                                             @NonNull String issueId) {
+    public static Single<List<Comment>> getIssueComments(@NonNull String repoId, @NonNull String login, @NonNull String issueId) {
         return App.getInstance().getDataStore()
                 .select(Comment.class)
                 .where(REPO_ID.equal(repoId)
@@ -128,12 +138,12 @@ import static com.fastaccess.data.dao.model.Comment.UPDATED_AT;
                         .and(ISSUE_ID.equal(issueId)))
                 .orderBy(UPDATED_AT.desc())
                 .get()
-                .toObservable()
+                .observable()
                 .toList();
     }
 
-    public static Observable<List<Comment>> getPullRequestComments(@NonNull String repoId, @NonNull String login,
-                                                                   @NonNull String pullRequestId) {
+    public static Single<List<Comment>> getPullRequestComments(@NonNull String repoId, @NonNull String login,
+                                                               @NonNull String pullRequestId) {
         return App.getInstance().getDataStore()
                 .select(Comment.class)
                 .where(REPO_ID.equal(repoId)
@@ -141,7 +151,7 @@ import static com.fastaccess.data.dao.model.Comment.UPDATED_AT;
                         .and(PULL_REQUEST_ID.equal(pullRequestId)))
                 .orderBy(UPDATED_AT.desc())
                 .get()
-                .toObservable()
+                .observable()
                 .toList();
     }
 
@@ -179,6 +189,7 @@ import static com.fastaccess.data.dao.model.Comment.UPDATED_AT;
         dest.writeString(this.issueId);
         dest.writeString(this.pullRequestId);
         dest.writeParcelable(this.reactions, flags);
+        dest.writeString(this.authorAssociation);
     }
 
     protected AbstractComment(Parcel in) {
@@ -202,6 +213,7 @@ import static com.fastaccess.data.dao.model.Comment.UPDATED_AT;
         this.issueId = in.readString();
         this.pullRequestId = in.readString();
         this.reactions = in.readParcelable(ReactionsModel.class.getClassLoader());
+        this.authorAssociation = in.readString();
     }
 
     public static final Creator<Comment> CREATOR = new Creator<Comment>() {

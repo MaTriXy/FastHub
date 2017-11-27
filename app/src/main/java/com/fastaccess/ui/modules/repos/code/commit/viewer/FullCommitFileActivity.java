@@ -27,7 +27,7 @@ import net.grandcentrix.thirtyinch.TiPresenter;
 
 import butterknife.BindString;
 import butterknife.BindView;
-import icepick.State;
+import com.evernote.android.state.State;
 
 /**
  * Created by Kosh on 24 Apr 2017, 2:53 PM
@@ -44,7 +44,7 @@ public class FullCommitFileActivity extends BaseActivity {
     @BindView(R.id.status) FontTextView status;
     @BindString(R.string.changes) String changesText;
     @BindString(R.string.addition) String additionText;
-    @BindString(R.string.delete) String deletionText;
+    @BindString(R.string.deletion) String deletionText;
     @BindString(R.string.status) String statusText;
 
     public static void start(@NonNull Context context, @NonNull CommitFileModel fileModel) {

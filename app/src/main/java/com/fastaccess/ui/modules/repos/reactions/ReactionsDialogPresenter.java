@@ -7,16 +7,17 @@ import android.support.annotation.Nullable;
 import com.annimon.stream.Collectors;
 import com.annimon.stream.Stream;
 import com.fastaccess.data.dao.Pageable;
-import com.fastaccess.data.dao.model.ReactionsModel;
+import com.fastaccess.data.dao.ReactionsModel;
 import com.fastaccess.data.dao.model.User;
 import com.fastaccess.data.dao.types.ReactionTypes;
 import com.fastaccess.helper.BundleConstant;
 import com.fastaccess.provider.rest.RestProvider;
+import com.fastaccess.provider.timeline.ReactionsProvider;
 import com.fastaccess.ui.base.mvp.presenter.BasePresenter;
 
 import java.util.ArrayList;
 
-import rx.Observable;
+import io.reactivex.Observable;
 
 /**
  * Created by Kosh on 11 Apr 2017, 11:20 AM
@@ -27,12 +28,11 @@ public class ReactionsDialogPresenter extends BasePresenter<ReactionsDialogMvp.V
     private int previousTotal;
     private int lastPage = Integer.MAX_VALUE;
     private ArrayList<User> users = new ArrayList<>();
-    private String login;
-    private String repoId;
-    private long id;
-    private ReactionTypes reactionType;
-    private boolean isHeader;
-    private boolean isCommit;
+    @com.evernote.android.state.State String login;
+    @com.evernote.android.state.State String repoId;
+    @com.evernote.android.state.State long id;
+    @com.evernote.android.state.State ReactionTypes reactionType;
+    @com.evernote.android.state.State @ReactionsProvider.ReactionType int reactionTypeMode;
 
     @Override public void onFragmentCreated(@Nullable Bundle bundle) {
         if (bundle != null) {
@@ -40,8 +40,7 @@ public class ReactionsDialogPresenter extends BasePresenter<ReactionsDialogMvp.V
             login = bundle.getString(BundleConstant.EXTRA_TWO);
             id = bundle.getLong(BundleConstant.ID);
             reactionType = (ReactionTypes) bundle.getSerializable(BundleConstant.EXTRA_TYPE);
-            isHeader = bundle.getBoolean(BundleConstant.EXTRA_THREE);
-            isCommit = bundle.getBoolean(BundleConstant.EXTRA_FOUR);
+            reactionTypeMode = bundle.getInt(BundleConstant.EXTRA_THREE);
             onCallApi(1, null);
         }
     }
@@ -66,25 +65,37 @@ public class ReactionsDialogPresenter extends BasePresenter<ReactionsDialogMvp.V
         this.previousTotal = previousTotal;
     }
 
-    @Override public void onCallApi(int page, @Nullable Object parameter) {
+    @Override public boolean onCallApi(int page, @Nullable Object parameter) {
         if (page == 1) {
             lastPage = Integer.MAX_VALUE;
             sendToView(view -> view.getLoadMore().reset());
         }
         if (page > lastPage || lastPage == 0 || (login == null || repoId == null || reactionType == null)) {
             sendToView(ReactionsDialogMvp.View::hideProgress);
-            return;
+            return false;
         }
         setCurrentPage(page);
-        Observable<Pageable<ReactionsModel>> observable = RestProvider.getReactionsService()
-                .getIssueCommentReaction(login, repoId, id, reactionType.getContent());
-        if (isHeader) {
-            observable = RestProvider.getReactionsService()
-                    .getIssueReaction(login, repoId, id, reactionType.getContent());
+        Observable<Pageable<ReactionsModel>> observable = null;
+        switch (reactionTypeMode) {
+            case ReactionsProvider.COMMENT:
+                observable = RestProvider.getReactionsService(isEnterprise())
+                        .getIssueCommentReaction(login, repoId, id, reactionType.getContent(), page);
+                break;
+            case ReactionsProvider.COMMIT:
+                observable = RestProvider.getReactionsService(isEnterprise())
+                        .getCommitReaction(login, repoId, id, reactionType.getContent(), page);
+                break;
+            case ReactionsProvider.HEADER:
+                observable = RestProvider.getReactionsService(isEnterprise())
+                        .getIssueReaction(login, repoId, id, reactionType.getContent(), page);
+                break;
+            case ReactionsProvider.REVIEW_COMMENT:
+                observable = RestProvider.getReactionsService(isEnterprise())
+                        .getPullRequestReactions(login, repoId, id, reactionType.getContent(), page);
+                break;
         }
-        if (isCommit) {
-            observable = RestProvider.getReactionsService()
-                    .getCommitReaction(login, repoId, id, reactionType.getContent());
+        if (observable == null) {
+            throw new NullPointerException("Reaction is null?");
         }
         makeRestCall(observable, response -> {
             lastPage = response.getLast();
@@ -93,6 +104,7 @@ public class ReactionsDialogPresenter extends BasePresenter<ReactionsDialogMvp.V
                     .map(ReactionsModel::getUser)
                     .collect(Collectors.toList()), page));
         });
+        return true;
     }
 
     ReactionTypes getReactionType() {

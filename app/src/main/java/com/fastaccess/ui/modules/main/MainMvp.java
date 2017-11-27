@@ -17,22 +17,32 @@ import it.sephiroth.android.library.bottomnavigation.BottomNavigation;
  * Created by Kosh on 09 Nov 2016, 7:51 PM
  */
 
-interface MainMvp {
+public interface MainMvp {
 
     int FEEDS = 0;
     int ISSUES = 1;
     int PULL_REQUESTS = 2;
+    int PROFILE = 3;
 
     @IntDef({
             FEEDS,
             ISSUES,
-            PULL_REQUESTS
+            PULL_REQUESTS,
+            PROFILE
     })
     @Retention(RetentionPolicy.SOURCE) @interface NavigationType {}
 
     interface View extends BaseMvp.FAView {
 
         void onNavigationChanged(@NavigationType int navType);
+
+        void onUpdateDrawerMenuHeader();
+
+        void onOpenProfile();
+
+        void onInvalidateNotification();
+
+        void onUserIsBlackListed();
     }
 
     interface Presenter extends BaseMvp.FAPresenter,

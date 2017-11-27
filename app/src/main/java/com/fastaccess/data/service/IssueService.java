@@ -7,31 +7,35 @@ import com.fastaccess.data.dao.AssigneesRequestModel;
 import com.fastaccess.data.dao.CommentRequestModel;
 import com.fastaccess.data.dao.CreateIssueModel;
 import com.fastaccess.data.dao.IssueRequestModel;
+import com.fastaccess.data.dao.IssuesPageable;
 import com.fastaccess.data.dao.LabelModel;
 import com.fastaccess.data.dao.Pageable;
 import com.fastaccess.data.dao.model.Comment;
 import com.fastaccess.data.dao.model.Issue;
 import com.fastaccess.data.dao.model.IssueEvent;
+import com.google.gson.JsonObject;
 
 import java.util.List;
 
+import io.reactivex.Observable;
 import retrofit2.Response;
 import retrofit2.http.Body;
 import retrofit2.http.DELETE;
 import retrofit2.http.GET;
+import retrofit2.http.HTTP;
 import retrofit2.http.Headers;
 import retrofit2.http.PATCH;
 import retrofit2.http.POST;
 import retrofit2.http.PUT;
 import retrofit2.http.Path;
 import retrofit2.http.Query;
-import rx.Observable;
 
 public interface IssueService {
 
     @GET("repos/{owner}/{repo}/issues")
     Observable<Pageable<Issue>> getRepositoryIssues(@Path("owner") String owner, @Path("repo") String repo,
-                                                    @Query("state") String state, @Query("page") int page);
+                                                    @Query("state") String state, @Query("sort") String sortBy,
+                                                    @Query("page") int page);
 
     @GET("search/issues") Observable<Pageable<Issue>> getIssuesWithCount(@NonNull @Query(value = "q", encoded = true) String query,
                                                                          @Query("page") int page);
@@ -44,9 +48,15 @@ public interface IssueService {
     Observable<Issue> getIssue(@Path("owner") String owner, @Path("repo") String repo,
                                @Path("number") int number);
 
-    @GET("repos/{owner}/{repo}/issues/{issue_number}/events?per_page=200")
+    @GET("repos/{owner}/{repo}/issues/{issue_number}/events?per_page=100")
     Observable<Pageable<IssueEvent>> getTimeline(@Path("owner") String owner, @Path("repo") String repo,
                                                  @Path("issue_number") int issue_number);
+
+    @GET("repos/{owner}/{repo}/issues/{issue_number}/timeline?per_page=100")
+    @Headers("Accept: application/vnd.github.mockingbird-preview,application/vnd.github.VERSION.full+json," +
+            " application/vnd.github.squirrel-girl-preview")
+    Observable<IssuesPageable<JsonObject>> getTimeline(@Path("owner") String owner, @Path("repo") String repo,
+                                                       @Path("issue_number") int issue_number, @Query("page") int page);
 
     @POST("repos/{owner}/{repo}/issues")
     Observable<Issue> createIssue(@Path("owner") String owner, @Path("repo") String repo,
@@ -66,11 +76,12 @@ public interface IssueService {
     Observable<Response<Boolean>> unlockIssue(@Path("owner") String owner, @Path("repo") String repo, @Path("number") int number);
 
 
-    @GET("repos/{owner}/{repo}/issues/{number}/comments?per_page=200")
+    @GET("repos/{owner}/{repo}/issues/{number}/comments?per_page=100")
     @Headers("Accept: application/vnd.github.VERSION.full+json, application/vnd.github.squirrel-girl-preview")
     Observable<Pageable<Comment>> getIssueComments(@Path("owner") String owner,
                                                    @Path("repo") String repo,
-                                                   @Path("number") int number);
+                                                   @Path("number") int number,
+                                                   @Query("page") int page);
 
     @GET("repos/{owner}/{repo}/issues/{number}/comments/{id}")
     @Headers("Accept: application/vnd.github.VERSION.full+json, application/vnd.github.squirrel-girl-preview")
@@ -102,5 +113,13 @@ public interface IssueService {
     Observable<Issue> putAssignees(@Path("owner") String owner, @Path("repo") String repo,
                                    @Path("number") int number, @Body AssigneesRequestModel body);
 
+    @HTTP(method = "DELETE", path = "repos/{owner}/{repo}/issues/{number}/assignees", hasBody = true)
+    Observable<Issue> deleteAssignees(@Path("owner") String owner, @Path("repo") String repo,
+                                      @Path("number") int number, @Body AssigneesRequestModel body);
+
+    @GET("/repos/{owner}/{repo}/issues/comments/{id}")
+    @Headers("Accept: application/vnd.github.mockingbird-preview,application/vnd.github.VERSION.full+json," +
+            " application/vnd.github.squirrel-girl-preview")
+    Observable<Comment> getComment(@Path("owner") String owner, @Path("repo") String repo, @Path("id") long id);
 
 }

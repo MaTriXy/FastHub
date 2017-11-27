@@ -14,6 +14,7 @@ import com.fastaccess.ui.adapter.GistsAdapter;
 import com.fastaccess.ui.base.BaseFragment;
 import com.fastaccess.ui.widgets.StateLayout;
 import com.fastaccess.ui.widgets.recyclerview.DynamicRecyclerView;
+import com.fastaccess.ui.widgets.recyclerview.scroll.RecyclerViewFastScroller;
 
 import java.util.List;
 
@@ -30,7 +31,7 @@ public class GistsFragment extends BaseFragment<GistsMvp.View, GistsPresenter> i
     @BindView(R.id.recycler) DynamicRecyclerView recycler;
     @BindView(R.id.refresh) SwipeRefreshLayout refresh;
     @BindView(R.id.stateLayout) StateLayout stateLayout;
-
+    @BindView(R.id.fastScroller) RecyclerViewFastScroller fastScroller;
     private GistsAdapter adapter;
     private OnLoadMore onLoadMore;
 
@@ -49,12 +50,14 @@ public class GistsFragment extends BaseFragment<GistsMvp.View, GistsPresenter> i
         recycler.setEmptyView(stateLayout, refresh);
         adapter = new GistsAdapter(getPresenter().getGists());
         adapter.setListener(getPresenter());
-        getLoadMore().setCurrent_page(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
+        getLoadMore().initialize(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
         recycler.setAdapter(adapter);
+        recycler.addKeyLineDivider();
         recycler.addOnScrollListener(getLoadMore());
         if (getPresenter().getGists().isEmpty() && !getPresenter().isApiCalled()) {
             onRefresh();
         }
+        fastScroller.attachRecyclerView(recycler);
     }
 
     @Override public void onRefresh() {
@@ -76,6 +79,8 @@ public class GistsFragment extends BaseFragment<GistsMvp.View, GistsPresenter> i
 
     @Override public void showProgress(@StringRes int resId) {
 
+        refresh.setRefreshing(true);
+
         stateLayout.showProgress();
     }
 
@@ -92,11 +97,6 @@ public class GistsFragment extends BaseFragment<GistsMvp.View, GistsPresenter> i
     @Override public void showMessage(int titleRes, int msgRes) {
         showReload();
         super.showMessage(titleRes, msgRes);
-    }
-
-    private void showReload() {
-        hideProgress();
-        stateLayout.showReload(adapter.getItemCount());
     }
 
     @NonNull @Override public GistsPresenter providePresenter() {
@@ -117,5 +117,15 @@ public class GistsFragment extends BaseFragment<GistsMvp.View, GistsPresenter> i
 
     @Override public void onClick(View view) {
         onRefresh();
+    }
+
+    @Override public void onScrollTop(int index) {
+        super.onScrollTop(index);
+        if (recycler != null) recycler.scrollToPosition(0);
+    }
+
+    private void showReload() {
+        hideProgress();
+        stateLayout.showReload(adapter.getItemCount());
     }
 }

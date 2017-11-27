@@ -16,6 +16,7 @@ import com.fastaccess.ui.adapter.TeamsAdapter;
 import com.fastaccess.ui.base.BaseFragment;
 import com.fastaccess.ui.widgets.StateLayout;
 import com.fastaccess.ui.widgets.recyclerview.DynamicRecyclerView;
+import com.fastaccess.ui.widgets.recyclerview.scroll.RecyclerViewFastScroller;
 
 import java.util.List;
 
@@ -30,6 +31,7 @@ public class OrgTeamFragment extends BaseFragment<OrgTeamMvp.View, OrgTeamPresen
     @BindView(R.id.recycler) DynamicRecyclerView recycler;
     @BindView(R.id.refresh) SwipeRefreshLayout refresh;
     @BindView(R.id.stateLayout) StateLayout stateLayout;
+    @BindView(R.id.fastScroller) RecyclerViewFastScroller fastScroller;
     private OnLoadMore<String> onLoadMore;
     private TeamsAdapter adapter;
 
@@ -53,7 +55,7 @@ public class OrgTeamFragment extends BaseFragment<OrgTeamMvp.View, OrgTeamPresen
     }
 
     @Override protected int fragmentLayout() {
-        return R.layout.small_grid_refresh_list;
+        return R.layout.micro_grid_refresh_list;
     }
 
     @Override protected void onFragmentCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
@@ -64,7 +66,7 @@ public class OrgTeamFragment extends BaseFragment<OrgTeamMvp.View, OrgTeamPresen
         stateLayout.setOnReloadListener(this);
         refresh.setOnRefreshListener(this);
         recycler.setEmptyView(stateLayout, refresh);
-        getLoadMore().setCurrent_page(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
+        getLoadMore().initialize(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
         adapter = new TeamsAdapter(getPresenter().getTeams());
         adapter.setListener(getPresenter());
         recycler.setAdapter(adapter);
@@ -73,6 +75,7 @@ public class OrgTeamFragment extends BaseFragment<OrgTeamMvp.View, OrgTeamPresen
         if (getPresenter().getTeams().isEmpty() && !getPresenter().isApiCalled()) {
             onRefresh();
         }
+        fastScroller.attachRecyclerView(recycler);
     }
 
     @NonNull @Override public OrgTeamPresenter providePresenter() {
@@ -80,6 +83,8 @@ public class OrgTeamFragment extends BaseFragment<OrgTeamMvp.View, OrgTeamPresen
     }
 
     @Override public void showProgress(@StringRes int resId) {
+
+        refresh.setRefreshing(true);
         stateLayout.showProgress();
     }
 
@@ -98,11 +103,6 @@ public class OrgTeamFragment extends BaseFragment<OrgTeamMvp.View, OrgTeamPresen
         super.showMessage(titleRes, msgRes);
     }
 
-    private void showReload() {
-        hideProgress();
-        stateLayout.showReload(adapter.getItemCount());
-    }
-
     @NonNull @Override public OnLoadMore<String> getLoadMore() {
         if (onLoadMore == null) {
             onLoadMore = new OnLoadMore<>(getPresenter(), getArguments().getString(BundleConstant.EXTRA));
@@ -116,5 +116,15 @@ public class OrgTeamFragment extends BaseFragment<OrgTeamMvp.View, OrgTeamPresen
 
     @Override public void onClick(View view) {
         onRefresh();
+    }
+
+    @Override public void onScrollTop(int index) {
+        super.onScrollTop(index);
+        if (recycler != null) recycler.scrollToPosition(0);
+    }
+
+    private void showReload() {
+        hideProgress();
+        stateLayout.showReload(adapter.getItemCount());
     }
 }

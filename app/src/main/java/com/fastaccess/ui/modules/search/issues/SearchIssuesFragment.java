@@ -8,20 +8,22 @@ import android.support.annotation.StringRes;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.view.View;
 
+import com.evernote.android.state.State;
 import com.fastaccess.R;
 import com.fastaccess.data.dao.model.Issue;
 import com.fastaccess.helper.InputHelper;
 import com.fastaccess.provider.rest.loadmore.OnLoadMore;
 import com.fastaccess.ui.adapter.IssuesAdapter;
 import com.fastaccess.ui.base.BaseFragment;
+import com.fastaccess.ui.modules.repos.extras.popup.IssuePopupFragment;
 import com.fastaccess.ui.modules.search.SearchMvp;
 import com.fastaccess.ui.widgets.StateLayout;
 import com.fastaccess.ui.widgets.recyclerview.DynamicRecyclerView;
+import com.fastaccess.ui.widgets.recyclerview.scroll.RecyclerViewFastScroller;
 
 import java.util.List;
 
 import butterknife.BindView;
-import icepick.State;
 
 /**
  * Created by Kosh on 03 Dec 2016, 3:56 PM
@@ -29,10 +31,11 @@ import icepick.State;
 
 public class SearchIssuesFragment extends BaseFragment<SearchIssuesMvp.View, SearchIssuesPresenter> implements SearchIssuesMvp.View {
 
-    @State String searchQuery;
+    @State String searchQuery = "";
     @BindView(R.id.recycler) DynamicRecyclerView recycler;
     @BindView(R.id.refresh) SwipeRefreshLayout refresh;
     @BindView(R.id.stateLayout) StateLayout stateLayout;
+    @BindView(R.id.fastScroller) RecyclerViewFastScroller fastScroller;
     private OnLoadMore<String> onLoadMore;
     private IssuesAdapter adapter;
     private SearchMvp.View countCallback;
@@ -71,16 +74,16 @@ public class SearchIssuesFragment extends BaseFragment<SearchIssuesMvp.View, Sea
     }
 
     @Override protected int fragmentLayout() {
-        return R.layout.small_grid_refresh_list;
+        return R.layout.micro_grid_refresh_list;
     }
 
     @Override protected void onFragmentCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         stateLayout.setEmptyText(R.string.no_search_results);
-        getLoadMore().setCurrent_page(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
+        getLoadMore().initialize(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
         stateLayout.setOnReloadListener(this);
         refresh.setOnRefreshListener(this);
         recycler.setEmptyView(stateLayout, refresh);
-        adapter = new IssuesAdapter(getPresenter().getIssues(), false, true);
+        adapter = new IssuesAdapter(getPresenter().getIssues(), false, true, true);
         adapter.setListener(getPresenter());
         recycler.setAdapter(adapter);
         recycler.addDivider();
@@ -90,6 +93,7 @@ public class SearchIssuesFragment extends BaseFragment<SearchIssuesMvp.View, Sea
         if (InputHelper.isEmpty(searchQuery)) {
             stateLayout.showEmptyState();
         }
+        fastScroller.attachRecyclerView(recycler);
     }
 
     @NonNull @Override public SearchIssuesPresenter providePresenter() {
@@ -102,6 +106,8 @@ public class SearchIssuesFragment extends BaseFragment<SearchIssuesMvp.View, Sea
     }
 
     @Override public void showProgress(@StringRes int resId) {
+
+        refresh.setRefreshing(true);
 
         stateLayout.showProgress();
     }
@@ -120,12 +126,17 @@ public class SearchIssuesFragment extends BaseFragment<SearchIssuesMvp.View, Sea
         this.searchQuery = query;
         getLoadMore().reset();
         adapter.clear();
-        recycler.scrollToPosition(0);
         if (!InputHelper.isEmpty(query)) {
             recycler.removeOnScrollListener(getLoadMore());
             recycler.addOnScrollListener(getLoadMore());
             onRefresh();
         }
+    }
+
+    @Override public void onQueueSearch(@NonNull String query) {
+        this.searchQuery = query;
+        if (getView() != null)
+            onSetSearchQuery(query);
     }
 
     @NonNull @Override public OnLoadMore<String> getLoadMore() {
@@ -136,12 +147,25 @@ public class SearchIssuesFragment extends BaseFragment<SearchIssuesMvp.View, Sea
         return onLoadMore;
     }
 
+    @Override public void onShowPopupDetails(@NonNull Issue item) {
+        IssuePopupFragment.showPopup(getChildFragmentManager(), item);
+    }
+
     @Override public void onRefresh() {
+        if (searchQuery.length() == 0) {
+            refresh.setRefreshing(false);
+            return;
+        }
         getPresenter().onCallApi(1, searchQuery);
     }
 
     @Override public void onClick(View view) {
         onRefresh();
+    }
+
+    @Override public void onScrollTop(int index) {
+        super.onScrollTop(index);
+        if (recycler != null) recycler.scrollToPosition(0);
     }
 
     private void showReload() {

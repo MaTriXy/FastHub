@@ -6,15 +6,16 @@ import android.content.Intent;
 import android.content.res.Resources;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.text.Editable;
-import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.View;
-import android.view.inputmethod.EditorInfo;
 import android.widget.PopupWindow;
 import android.widget.Toast;
 
+import com.evernote.android.state.State;
+import com.fastaccess.App;
 import com.fastaccess.R;
 import com.fastaccess.data.dao.LabelModel;
 import com.fastaccess.data.dao.MilestoneModel;
@@ -26,6 +27,7 @@ import com.fastaccess.helper.BundleConstant;
 import com.fastaccess.helper.Bundler;
 import com.fastaccess.helper.InputHelper;
 import com.fastaccess.helper.ViewHelper;
+import com.fastaccess.provider.timeline.CommentsHelper;
 import com.fastaccess.ui.adapter.LabelsAdapter;
 import com.fastaccess.ui.adapter.MilestonesAdapter;
 import com.fastaccess.ui.adapter.SimpleListAdapter;
@@ -39,7 +41,8 @@ import com.fastaccess.ui.widgets.SpannableBuilder;
 import com.fastaccess.ui.widgets.recyclerview.BaseViewHolder;
 import com.fastaccess.ui.widgets.recyclerview.DynamicRecyclerView;
 
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collections;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
@@ -47,7 +50,6 @@ import butterknife.OnClick;
 import butterknife.OnEditorAction;
 import butterknife.OnTextChanged;
 import es.dmoral.toasty.Toasty;
-import icepick.State;
 
 /**
  * Created by Kosh on 09 Apr 2017, 6:23 PM
@@ -69,6 +71,7 @@ public class FilterIssuesActivity extends BaseActivity<FilterIssuesActivityMvp.V
     @State boolean isOpen;
     @State String login;
     @State String repoId;
+    @State String criteria;
 
     private FilterIssueFragment filterFragment;
     private MilestonesAdapter milestonesAdapter;
@@ -77,13 +80,14 @@ public class FilterIssuesActivity extends BaseActivity<FilterIssuesActivityMvp.V
     private PopupWindow popupWindow;
 
     public static void startActivity(@NonNull Activity context, @NonNull String login, @NonNull String repoId,
-                                     boolean isIssue, boolean isOpen) {
+                                     boolean isIssue, boolean isOpen, boolean isEnterprise) {
         Intent intent = new Intent(context, FilterIssuesActivity.class);
         intent.putExtras(Bundler.start()
                 .put(BundleConstant.EXTRA, login)
                 .put(BundleConstant.ID, repoId)
                 .put(BundleConstant.EXTRA_TWO, isIssue)
                 .put(BundleConstant.EXTRA_THREE, isOpen)
+                .put(BundleConstant.IS_ENTERPRISE, isEnterprise)
                 .end());
         View view = context.findViewById(R.id.fab);
         if (view != null) {
@@ -91,6 +95,21 @@ public class FilterIssuesActivity extends BaseActivity<FilterIssuesActivityMvp.V
         } else {
             context.startActivity(intent);
         }
+    }
+
+    public static void startActivity(@NonNull View view, @NonNull String login, @NonNull String repoId,
+                                     boolean isIssue, boolean isOpen, boolean isEnterprise, @NonNull String criteria) {
+        Intent intent = new Intent(view.getContext(), FilterIssuesActivity.class);
+        intent.putExtras(Bundler.start()
+                .put(BundleConstant.EXTRA, login)
+                .put(BundleConstant.ID, repoId)
+                .put(BundleConstant.EXTRA_TWO, isIssue)
+                .put(BundleConstant.EXTRA_THREE, isOpen)
+                .put(BundleConstant.IS_ENTERPRISE, isEnterprise)
+                .put(BundleConstant.EXTRA_FOUR, criteria)
+                .end());
+        //noinspection ConstantConditions
+        ActivityHelper.startReveal(ActivityHelper.getActivity(view.getContext()), intent, view);
     }
 
     @Override protected int layout() {
@@ -121,6 +140,7 @@ public class FilterIssuesActivity extends BaseActivity<FilterIssuesActivityMvp.V
             isOpen = bundle.getBoolean(BundleConstant.EXTRA_THREE);
             repoId = bundle.getString(BundleConstant.ID);
             login = bundle.getString(BundleConstant.EXTRA);
+            criteria = bundle.getString(BundleConstant.EXTRA_FOUR);
             getPresenter().onStart(login, repoId);
             if (isOpen) {
                 onOpenClicked();
@@ -144,7 +164,11 @@ public class FilterIssuesActivity extends BaseActivity<FilterIssuesActivityMvp.V
                 searchEditText.setText(text);
                 onSearch();
             } else {
-                searchEditText.setText(String.format("%s %s", isOpen ? "is:open" : "is:closed", isIssue ? "is:issue" : "is:pr"));
+                searchEditText.setText(String.format("%s %s ", isOpen ? "is:open" : "is:closed", isIssue ? "is:issue" : "is:pr"));
+                if (!InputHelper.isEmpty(criteria)) {
+                    searchEditText.setText(String.format("%s%s", InputHelper.toString(searchEditText), criteria));
+                    criteria = null;
+                }
                 onSearch();
             }
         }
@@ -160,69 +184,90 @@ public class FilterIssuesActivity extends BaseActivity<FilterIssuesActivityMvp.V
                 searchEditText.setText(text);
                 onSearch();
             } else {
-                searchEditText.setText(String.format("%s %s", isOpen ? "is:open" : "is:closed", isIssue ? "is:issue" : "is:pr"));
+                searchEditText.setText(String.format("%s %s ", isOpen ? "is:open" : "is:closed", isIssue ? "is:issue" : "is:pr"));
                 onSearch();
             }
         }
     }
 
     @OnClick(R.id.author) public void onAuthorClicked() {
-        Toasty.info(this, "GitHub doesn't have this API yet!\nYou can try typing it yourself for example author:k0shk0sh",
+        Toasty.info(App.getInstance(), "GitHub doesn't have this API yet!\nYou can try typing it yourself for example author:k0shk0sh",
                 Toast.LENGTH_LONG).show();
     }
 
     @SuppressLint("InflateParams") @OnClick(R.id.labels) public void onLabelsClicked() {
+        if (labels.getTag() != null) return;
+        labels.setTag(true);
         ViewHolder viewHolder = new ViewHolder(LayoutInflater.from(this).inflate(R.layout.simple_list_dialog, null));
-        popupWindow = new PopupWindow(this);
-        popupWindow.setContentView(viewHolder.view);
-        popupWindow.setOutsideTouchable(true);
-        popupWindow.setBackgroundDrawable(new ColorDrawable(ViewHelper.getWindowBackground(this)));
-        popupWindow.setElevation(getResources().getDimension(R.dimen.spacing_normal));
+        setupPopupWindow(viewHolder);
         viewHolder.recycler.setAdapter(getLabelsAdapter());
         AnimHelper.revealPopupWindow(popupWindow, labels);
     }
 
     @SuppressLint("InflateParams") @OnClick(R.id.milestone) public void onMilestoneClicked() {
+        if (milestone.getTag() != null) return;
+        milestone.setTag(true);
         ViewHolder viewHolder = new ViewHolder(LayoutInflater.from(this).inflate(R.layout.simple_list_dialog, null));
-        popupWindow = new PopupWindow(this);
-        popupWindow.setContentView(viewHolder.view);
-        popupWindow.setOutsideTouchable(true);
-        popupWindow.setElevation(getResources().getDimension(R.dimen.spacing_micro));
-        popupWindow.setBackgroundDrawable(new ColorDrawable(ViewHelper.getWindowBackground(this)));
-        popupWindow.setElevation(getResources().getDimension(R.dimen.spacing_normal));
+        setupPopupWindow(viewHolder);
         viewHolder.recycler.setAdapter(getMilestonesAdapter());
         AnimHelper.revealPopupWindow(popupWindow, milestone);
     }
 
     @SuppressLint("InflateParams") @OnClick(R.id.assignee) public void onAssigneeClicked() {
+        if (assignee.getTag() != null) return;
+        assignee.setTag(true);
         ViewHolder viewHolder = new ViewHolder(LayoutInflater.from(this).inflate(R.layout.simple_list_dialog, null));
-        popupWindow = new PopupWindow(this);
-        popupWindow.setContentView(viewHolder.view);
-        popupWindow.setOutsideTouchable(true);
-        popupWindow.setElevation(getResources().getDimension(R.dimen.spacing_micro));
-        popupWindow.setBackgroundDrawable(new ColorDrawable(ViewHelper.getWindowBackground(this)));
-        popupWindow.setElevation(getResources().getDimension(R.dimen.spacing_normal));
+        setupPopupWindow(viewHolder);
         viewHolder.recycler.setAdapter(getAssigneesAdapter());
         AnimHelper.revealPopupWindow(popupWindow, assignee);
     }
 
     @SuppressLint("InflateParams") @OnClick(R.id.sort) public void onSortClicked() {
+        if (sort.getTag() != null) return;
+        sort.setTag(true);
         ViewHolder viewHolder = new ViewHolder(LayoutInflater.from(this).inflate(R.layout.simple_list_dialog, null));
-        popupWindow = new PopupWindow(this);
-        popupWindow.setContentView(viewHolder.view);
-        popupWindow.setOutsideTouchable(true);
-        popupWindow.setElevation(getResources().getDimension(R.dimen.spacing_micro));
-        popupWindow.setBackgroundDrawable(new ColorDrawable(ViewHelper.getWindowBackground(this)));
-        popupWindow.setElevation(getResources().getDimension(R.dimen.spacing_normal));
-        viewHolder.recycler.setAdapter(new SimpleListAdapter<>(Arrays.asList(getResources().getStringArray(R.array.sort_prs_issues)),
-                new BaseViewHolder.OnItemClickListener<String>() {
-                    @Override public void onItemClick(int position, View v, String item) {
-                        appendSort(item);
-                    }
+        setupPopupWindow(viewHolder);
+        ArrayList<String> lists = new ArrayList<>();
+        Collections.addAll(lists, getResources().getStringArray(R.array.sort_prs_issues));
+        lists.add(CommentsHelper.getThumbsUp());
+        lists.add(CommentsHelper.getThumbsDown());
+        lists.add(CommentsHelper.getLaugh());
+        lists.add(CommentsHelper.getHooray());
+        lists.add(CommentsHelper.getSad());
+        lists.add(CommentsHelper.getHeart());
+        viewHolder.recycler.setAdapter(new SimpleListAdapter<>(lists, new BaseViewHolder.OnItemClickListener<String>() {
+            @Override public void onItemClick(int position, View v, String item) {
+                appendSort(item);
+            }
 
-                    @Override public void onItemLongClick(int position, View v, String item) {}
-                }));
-        AnimHelper.revealPopupWindow(popupWindow, assignee);
+            @Override public void onItemLongClick(int position, View v, String item) {}
+        }));
+        AnimHelper.revealPopupWindow(popupWindow, sort);
+    }
+
+    @OnClick(value = {R.id.clear}) void onClear(View view) {
+        if (view.getId() == R.id.clear) {
+            AppHelper.hideKeyboard(searchEditText);
+            searchEditText.setText("");
+        }
+    }
+
+    @OnClick(R.id.search) void onSearchClicked() {
+        onSearch();
+    }
+
+    @OnTextChanged(value = R.id.searchEditText, callback = OnTextChanged.Callback.AFTER_TEXT_CHANGED) void onTextChange(Editable s) {
+        String text = s.toString();
+        if (text.length() == 0) {
+            AnimHelper.animateVisibility(clear, false);
+        } else {
+            AnimHelper.animateVisibility(clear, true);
+        }
+    }
+
+    @OnEditorAction(R.id.searchEditText) protected boolean onEditor() {
+        onSearchClicked();
+        return true;
     }
 
     @Override public void onSetCount(int count, boolean isOpen) {
@@ -251,31 +296,6 @@ public class FilterIssuesActivity extends BaseActivity<FilterIssuesActivityMvp.V
         super.hideProgress();
     }
 
-    @OnTextChanged(value = R.id.searchEditText, callback = OnTextChanged.Callback.AFTER_TEXT_CHANGED) void onTextChange(Editable s) {
-        String text = s.toString();
-        if (text.length() == 0) {
-            AnimHelper.animateVisibility(clear, false);
-        } else {
-            AnimHelper.animateVisibility(clear, true);
-        }
-    }
-
-    @OnClick(value = {R.id.clear}) void onClear(View view) {
-        if (view.getId() == R.id.clear) {
-            AppHelper.hideKeyboard(searchEditText);
-            searchEditText.setText("");
-        }
-    }
-
-    @OnEditorAction(R.id.searchEditText) boolean onEditor(int actionId, KeyEvent keyEvent) {
-        if (keyEvent != null && keyEvent.getAction() == KeyEvent.KEYCODE_SEARCH) {
-            onSearch();
-        } else if (actionId == EditorInfo.IME_ACTION_SEARCH) {
-            onSearch();
-        }
-        return false;
-    }
-
     @NonNull private String getRepoName() {
         return "repo:" + login + "/" + repoId + " ";
     }// let users stay within selected repo context.
@@ -288,9 +308,29 @@ public class FilterIssuesActivity extends BaseActivity<FilterIssuesActivityMvp.V
         }
     }
 
+    private void setupPopupWindow(@NonNull ViewHolder viewHolder) {
+        if (popupWindow == null) {
+            popupWindow = new PopupWindow(this);
+            popupWindow.setElevation(getResources().getDimension(R.dimen.spacing_micro));
+            popupWindow.setOutsideTouchable(true);
+            popupWindow.setBackgroundDrawable(new ColorDrawable(ViewHelper.getWindowBackground(this)));
+            popupWindow.setElevation(getResources().getDimension(R.dimen.spacing_normal));
+            popupWindow.setOnDismissListener(() -> new Handler().postDelayed(() -> {
+                //hacky way to dismiss on re-selecting tab.
+                if (assignee == null || milestone == null || sort == null || labels == null) return;
+                assignee.setTag(null);
+                milestone.setTag(null);
+                sort.setTag(null);
+                labels.setTag(null);
+            }, 100));
+        }
+        popupWindow.setContentView(viewHolder.view);
+    }
+
     private void onSearch() {
         if (!InputHelper.isEmpty(searchEditText)) {
-            getFilterFragment().onSearch(getRepoName() + InputHelper.toString(searchEditText), open.isSelected(), isIssue);
+            getFilterFragment().onSearch(getRepoName() + InputHelper.toString(searchEditText),
+                    open.isSelected(), isIssue, isEnterprise());
             searchEditText.setSelection(searchEditText.getEditableText().length());
         } else {
             getFilterFragment().onClear();
@@ -459,6 +499,12 @@ public class FilterIssuesActivity extends BaseActivity<FilterIssuesActivityMvp.V
         String leastCommentedQuery = "comments-asc";
         String recentlyUpdatedQuery = "updated-desc";
         String leastRecentUpdatedQuery = "updated-asc";
+        String sortThumbUp = "reactions-%2B1-desc";
+        String sortThumbDown = "reactions--1-desc";
+        String sortThumbLaugh = "reactions-smile-desc";
+        String sortThumbHooray = "reactions-tada-desc";
+        String sortThumbConfused = "reactions-thinking_face-desc";
+        String sortThumbHeart = "reactions-heart-desc";
         String toQuery = "";
         String text = InputHelper.toString(searchEditText);
         if (item.equalsIgnoreCase(resources.getString(R.string.newest))) {
@@ -479,6 +525,18 @@ public class FilterIssuesActivity extends BaseActivity<FilterIssuesActivityMvp.V
             toQuery = recentlyUpdatedQuery;
         } else if (item.equalsIgnoreCase(resources.getString(R.string.least_recent_updated))) {
             toQuery = leastRecentUpdatedQuery;
+        } else if (item.equalsIgnoreCase(CommentsHelper.getThumbsUp())) {
+            toQuery = sortThumbUp;
+        } else if (item.equalsIgnoreCase(CommentsHelper.getThumbsDown())) {
+            toQuery = sortThumbDown;
+        } else if (item.equalsIgnoreCase(CommentsHelper.getLaugh())) {
+            toQuery = sortThumbLaugh;
+        } else if (item.equalsIgnoreCase(CommentsHelper.getHooray())) {
+            toQuery = sortThumbHooray;
+        } else if (item.equalsIgnoreCase(CommentsHelper.getSad())) {
+            toQuery = sortThumbConfused;
+        } else if (item.equalsIgnoreCase(CommentsHelper.getHeart())) {
+            toQuery = sortThumbHeart;
         }
         if (!text.replaceAll(regex, "sort:\"" + toQuery + "\"").equalsIgnoreCase(text)) {
             String space = text.endsWith(" ") ? "" : " ";

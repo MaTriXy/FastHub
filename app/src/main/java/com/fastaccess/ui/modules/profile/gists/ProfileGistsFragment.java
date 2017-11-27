@@ -11,6 +11,7 @@ import android.view.View;
 
 import com.fastaccess.R;
 import com.fastaccess.data.dao.model.Gist;
+import com.fastaccess.data.dao.model.Login;
 import com.fastaccess.helper.BundleConstant;
 import com.fastaccess.helper.Bundler;
 import com.fastaccess.provider.rest.loadmore.OnLoadMore;
@@ -19,6 +20,7 @@ import com.fastaccess.ui.base.BaseFragment;
 import com.fastaccess.ui.modules.gists.gist.GistActivity;
 import com.fastaccess.ui.widgets.StateLayout;
 import com.fastaccess.ui.widgets.recyclerview.DynamicRecyclerView;
+import com.fastaccess.ui.widgets.recyclerview.scroll.RecyclerViewFastScroller;
 
 import java.util.List;
 
@@ -33,13 +35,17 @@ public class ProfileGistsFragment extends BaseFragment<ProfileGistsMvp.View, Pro
     @BindView(R.id.recycler) DynamicRecyclerView recycler;
     @BindView(R.id.refresh) SwipeRefreshLayout refresh;
     @BindView(R.id.stateLayout) StateLayout stateLayout;
+    @BindView(R.id.fastScroller) RecyclerViewFastScroller fastScroller;
 
     private GistsAdapter adapter;
     private OnLoadMore<String> onLoadMore;
 
     public static ProfileGistsFragment newInstance(@NonNull String login) {
         ProfileGistsFragment view = new ProfileGistsFragment();
-        view.setArguments(Bundler.start().put(BundleConstant.EXTRA, login).end());
+        view.setArguments(Bundler.start()
+                .put(BundleConstant.EXTRA, login)
+                .put(BundleConstant.IS_ENTERPRISE, Login.getUser().getLogin().equalsIgnoreCase(login))
+                .end());
         return view;
     }
 
@@ -57,13 +63,14 @@ public class ProfileGistsFragment extends BaseFragment<ProfileGistsMvp.View, Pro
         recycler.setEmptyView(stateLayout, refresh);
         adapter = new GistsAdapter(getPresenter().getGists(), true);
         adapter.setListener(getPresenter());
-        getLoadMore().setCurrent_page(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
+        getLoadMore().initialize(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
         recycler.setAdapter(adapter);
         recycler.addOnScrollListener(getLoadMore());
         recycler.addDivider();
         if (getPresenter().getGists().isEmpty() && !getPresenter().isApiCalled()) {
             onRefresh();
         }
+        fastScroller.attachRecyclerView(recycler);
     }
 
     @Override public void onRefresh() {
@@ -84,7 +91,7 @@ public class ProfileGistsFragment extends BaseFragment<ProfileGistsMvp.View, Pro
     }
 
     @Override public void showProgress(@StringRes int resId) {
-
+        refresh.setRefreshing(true);
         stateLayout.showProgress();
     }
 
@@ -115,7 +122,7 @@ public class ProfileGistsFragment extends BaseFragment<ProfileGistsMvp.View, Pro
     }
 
     @Override public void onStartGistView(@NonNull String gistId) {
-        startActivityForResult(GistActivity.createIntent(getContext(), gistId), BundleConstant.REQUEST_CODE);
+        startActivityForResult(GistActivity.createIntent(getContext(), gistId, isEnterprise()), BundleConstant.REQUEST_CODE);
     }
 
     @Override public void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -126,12 +133,19 @@ public class ProfileGistsFragment extends BaseFragment<ProfileGistsMvp.View, Pro
                 if (gistsModel != null && adapter != null) {
                     adapter.removeItem(gistsModel);
                 }
+            } else {
+                onRefresh();
             }
         }
     }
 
     @Override public void onClick(View view) {
         onRefresh();
+    }
+
+    @Override public void onScrollTop(int index) {
+        super.onScrollTop(index);
+        if (recycler != null) recycler.scrollToPosition(0);
     }
 
     private void showReload() {

@@ -17,7 +17,7 @@ import com.fastaccess.ui.base.mvp.presenter.BasePresenter;
 import java.util.ArrayList;
 import java.util.List;
 
-import rx.Observable;
+import io.reactivex.Observable;
 
 /**
  * Created by Kosh on 25 Apr 2017, 3:55 PM
@@ -30,12 +30,10 @@ public class UnreadNotificationsPresenter extends BasePresenter<UnreadNotificati
         if (getView() == null) return;
         Notification item = model.getNotification();
         if (v.getId() == R.id.markAsRead) {
-            if (item.isUnread() && !PrefGetter.isMarkAsReadEnabled()) {
-                markAsRead(position, v, item);
-            }
+            if (item.isUnread()) markAsRead(position, v, item);
         } else if (v.getId() == R.id.unsubsribe) {
             item.setUnread(false);
-            manageSubscription(item.save(item).subscribe());
+            manageDisposable(item.save(item));
             sendToView(view -> view.onRemove(position));
             ReadNotificationService.unSubscribe(v.getContext(), item.getId());
         } else {
@@ -52,8 +50,8 @@ public class UnreadNotificationsPresenter extends BasePresenter<UnreadNotificati
 
     @Override public void onWorkOffline() {
         if (notifications.isEmpty()) {
-            manageSubscription(RxHelper.getObserver(Notification.getUnreadNotifications())
-                    .flatMap(notifications -> Observable.from(GroupedNotificationModel.onlyNotifications(notifications)).toList())
+            manageDisposable(RxHelper.getObservable(Notification.getUnreadNotifications().toObservable())
+                    .flatMap(notifications -> Observable.just(GroupedNotificationModel.onlyNotifications(notifications)))
                     .subscribe(models -> sendToView(view -> view.onNotifyAdapter(models))));
         } else {
             sendToView(BaseMvp.FAView::hideProgress);
@@ -65,21 +63,21 @@ public class UnreadNotificationsPresenter extends BasePresenter<UnreadNotificati
     }
 
     @Override public void onMarkAllAsRead(@NonNull List<GroupedNotificationModel> data) {
-        manageSubscription(RxHelper.getObserver(Observable.from(data))
+        manageDisposable(RxHelper.getObservable(Observable.fromIterable(data))
                 .filter(group -> group.getType() == GroupedNotificationModel.ROW)
                 .filter(group -> group.getNotification() != null && group.getNotification().isUnread())
                 .map(GroupedNotificationModel::getNotification)
                 .subscribe(notification -> {
                     notification.setUnread(false);
-                    manageSubscription(notification.save(notification).subscribe());
+                    manageDisposable(notification.save(notification));
                     sendToView(view -> view.onReadNotification(notification));
-                }));
+                }, this::onError));
     }
 
     @Override public void onCallApi() {
-        Observable<List<GroupedNotificationModel>> observable = RestProvider.getNotificationService()
+        Observable<List<GroupedNotificationModel>> observable = RestProvider.getNotificationService(PrefGetter.isEnterprise())
                 .getNotifications(ParseDateFormat.getLastWeekDate()).flatMap(response -> {
-                    if (response.getItems() != null) manageSubscription(Notification.save(response.getItems()).subscribe());
+                    if (response.getItems() != null) manageDisposable(Notification.save(response.getItems()));
                     return Observable.just(GroupedNotificationModel.onlyNotifications(response.getItems()));
                 });
         makeRestCall(observable, response -> sendToView(view -> view.onNotifyAdapter(response)));
@@ -87,7 +85,7 @@ public class UnreadNotificationsPresenter extends BasePresenter<UnreadNotificati
 
     private void markAsRead(int position, View v, Notification item) {
         item.setUnread(false);
-        manageSubscription(item.save(item).subscribe());
+        manageDisposable(item.save(item));
         sendToView(view -> view.onRemove(position));
         ReadNotificationService.start(v.getContext(), item.getId());
     }

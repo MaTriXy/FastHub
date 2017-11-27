@@ -7,9 +7,11 @@ import android.support.annotation.NonNull;
 import com.fastaccess.App;
 import com.fastaccess.data.dao.LicenseModel;
 import com.fastaccess.data.dao.RepoPermissionsModel;
+import com.fastaccess.data.dao.TopicsModel;
 import com.fastaccess.data.dao.converters.LicenseConverter;
 import com.fastaccess.data.dao.converters.RepoConverter;
 import com.fastaccess.data.dao.converters.RepoPermissionConverter;
+import com.fastaccess.data.dao.converters.TopicsConverter;
 import com.fastaccess.data.dao.converters.UserConverter;
 import com.fastaccess.helper.RxHelper;
 import com.google.gson.annotations.SerializedName;
@@ -17,20 +19,23 @@ import com.google.gson.annotations.SerializedName;
 import java.util.Date;
 import java.util.List;
 
+import io.reactivex.Maybe;
+import io.reactivex.Single;
+import io.reactivex.disposables.Disposable;
+import io.requery.BlockingEntityStore;
 import io.requery.Column;
 import io.requery.Convert;
 import io.requery.Entity;
 import io.requery.Key;
+import io.requery.Nullable;
 import io.requery.Persistable;
-import io.requery.rx.SingleEntityStore;
 import lombok.NoArgsConstructor;
-import rx.Observable;
-import rx.Single;
 
 import static com.fastaccess.data.dao.model.Repo.FULL_NAME;
 import static com.fastaccess.data.dao.model.Repo.ID;
 import static com.fastaccess.data.dao.model.Repo.REPOS_OWNER;
 import static com.fastaccess.data.dao.model.Repo.STARRED_USER;
+import static com.fastaccess.data.dao.model.Repo.STATUSES_URL;
 import static com.fastaccess.data.dao.model.Repo.UPDATED_AT;
 
 /**
@@ -104,6 +109,7 @@ import static com.fastaccess.data.dao.model.Repo.UPDATED_AT;
     long openIssues;
     long watchers;
     String defaultBranch;
+    @Nullable @Convert(TopicsConverter.class) TopicsModel topics;
     @Convert(UserConverter.class) User owner;
     @Convert(RepoPermissionConverter.class) RepoPermissionsModel permissions;
     @Convert(UserConverter.class) User organization;
@@ -114,21 +120,22 @@ import static com.fastaccess.data.dao.model.Repo.UPDATED_AT;
     int networkCount;
     String starredUser;
     String reposOwner;
+    @Nullable boolean hasProjects;
 
-    public Single save(@NonNull Repo entity) {
-        return App.getInstance().getDataStore().delete(Repo.class)
-                .where(ID.eq(entity.getId()))
-                .get()
-                .toSingle()
-                .flatMap(i -> App.getInstance().getDataStore().insert(entity));
+    public Disposable save(Repo entity) {
+        return Single.create(e -> {
+            BlockingEntityStore<Persistable> dataSource = App.getInstance().getDataStore().toBlocking();
+            dataSource.delete(Repo.class).where(Repo.ID.eq(entity.getId())).get().value();
+            dataSource.insert(entity);
+        }).subscribe(o -> {/**/}, Throwable::printStackTrace);
     }
 
-    public static Observable<Repo> getRepo(@NonNull String name, @NonNull String login) {
+    public static Maybe<Repo> getRepo(@NonNull String name, @NonNull String login) {
         return App.getInstance().getDataStore()
                 .select(Repo.class)
                 .where(FULL_NAME.eq(login + "/" + name))
                 .get()
-                .toObservable();
+                .maybe();
     }
 
     public static Repo getRepo(long id) {
@@ -139,52 +146,101 @@ import static com.fastaccess.data.dao.model.Repo.UPDATED_AT;
                 .firstOrNull();
     }
 
-    public static Observable saveStarred(@NonNull List<Repo> models, @NonNull String starredUser) {
-        SingleEntityStore<Persistable> singleEntityStore = App.getInstance().getDataStore();
-        return RxHelper.safeObservable(singleEntityStore.delete(Repo.class)
-                .where(STARRED_USER.eq(starredUser))
-                .get()
-                .toSingle()
-                .toObservable()
-                .flatMap(integer -> Observable.from(models))
-                .flatMap(repo -> {
-                    repo.setStarredUser(starredUser);
-                    return repo.save(repo).toObservable();
-                }));
+    public static Disposable saveStarred(@NonNull List<Repo> models, @NonNull String starredUser) {
+        return RxHelper.getSingle(Single.fromPublisher(s -> {
+            try {
+                Login login = Login.getUser();
+                if (login != null) {
+                    BlockingEntityStore<Persistable> dataSource = App.getInstance().getDataStore().toBlocking();
+                    if (login.getLogin().equalsIgnoreCase(starredUser)) {
+                        dataSource.delete(Repo.class)
+                                .where(STARRED_USER.eq(starredUser))
+                                .get()
+                                .value();
+                        if (!models.isEmpty()) {
+                            for (Repo repo : models) {
+                                dataSource.delete(Repo.class).where(Repo.ID.eq(repo.getId())).get().value();
+                                repo.setStarredUser(starredUser);
+                                dataSource.insert(repo);
+                            }
+                        }
+                    } else {
+                        dataSource.delete(Repo.class)
+                                .where(STARRED_USER.notEqual(login.getLogin())
+                                        .or(STATUSES_URL.isNull()))
+                                .get()
+                                .value();
+                    }
+                }
+                s.onNext("");
+            } catch (Exception ignored) {}
+            s.onComplete();
+        })).subscribe(o -> {/*donothing*/}, Throwable::printStackTrace);
     }
 
-    public static Observable saveMyRepos(@NonNull List<Repo> models, @NonNull String reposOwner) {
-        SingleEntityStore<Persistable> singleEntityStore = App.getInstance().getDataStore();
-        return RxHelper.safeObservable(singleEntityStore.delete(Repo.class)
-                .where(REPOS_OWNER.eq(reposOwner))
-                .get()
-                .toSingle()
-                .toObservable()
-                .flatMap(integer -> Observable.from(models))
-                .flatMap(repo -> {
-                    repo.setReposOwner(reposOwner);
-                    return repo.save(repo).toObservable();
-                }));
+    public static Disposable saveMyRepos(@NonNull List<Repo> models, @NonNull String reposOwner) {
+        return RxHelper.getSingle(Single.fromPublisher(s -> {
+            try {
+                Login login = Login.getUser();
+                if (login != null) {
+                    BlockingEntityStore<Persistable> dataSource = App.getInstance().getDataStore().toBlocking();
+                    if (login.getLogin().equalsIgnoreCase(reposOwner)) {
+                        dataSource.delete(Repo.class)
+                                .where(REPOS_OWNER.eq(reposOwner))
+                                .get()
+                                .value();
+                        if (!models.isEmpty()) {
+                            for (Repo repo : models) {
+                                dataSource.delete(Repo.class).where(Repo.ID.eq(repo.getId())).get().value();
+                                repo.setReposOwner(reposOwner);
+                                dataSource.insert(repo);
+                            }
+                        }
+                    } else {
+                        dataSource.delete(Repo.class)
+                                .where(REPOS_OWNER.notEqual(login.getLogin())
+                                        .or(REPOS_OWNER.isNull()))
+                                .get()
+                                .value();
+                    }
+                }
+                s.onNext("");
+            } catch (Exception e) {
+                s.onError(e);
+            }
+            s.onComplete();
+        })).subscribe(o -> {/*donothing*/}, Throwable::printStackTrace);
     }
 
-    public static Observable<List<Repo>> getStarred(@NonNull String starredUser) {
+    public static Single<List<Repo>> getStarred(@NonNull String starredUser) {
         return App.getInstance().getDataStore()
                 .select(Repo.class)
                 .where(STARRED_USER.eq(starredUser))
                 .orderBy(UPDATED_AT.desc())
                 .get()
-                .toObservable()
+                .observable()
                 .toList();
     }
 
-    public static Observable<List<Repo>> getMyRepos(@NonNull String reposOwner) {
+    public static Single<List<Repo>> getMyRepos(@NonNull String reposOwner) {
         return App.getInstance().getDataStore()
                 .select(Repo.class)
                 .where(REPOS_OWNER.eq(reposOwner))
                 .orderBy(UPDATED_AT.desc())
                 .get()
-                .toObservable()
+                .observable()
                 .toList();
+    }
+
+    @Override public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        AbstractRepo that = (AbstractRepo) o;
+        return id == that.id;
+    }
+
+    @Override public int hashCode() {
+        return (int) (id ^ (id >>> 32));
     }
 
     @Override public int describeContents() { return 0; }
@@ -256,6 +312,7 @@ import static com.fastaccess.data.dao.model.Repo.UPDATED_AT;
         dest.writeLong(this.openIssues);
         dest.writeLong(this.watchers);
         dest.writeString(this.defaultBranch);
+        dest.writeList(this.topics);
         dest.writeParcelable(this.owner, flags);
         dest.writeParcelable(this.permissions, flags);
         dest.writeParcelable(this.organization, flags);
@@ -266,6 +323,7 @@ import static com.fastaccess.data.dao.model.Repo.UPDATED_AT;
         dest.writeInt(this.networkCount);
         dest.writeString(this.starredUser);
         dest.writeString(this.reposOwner);
+        dest.writeByte(this.hasProjects ? (byte) 1 : (byte) 0);
     }
 
     protected AbstractRepo(Parcel in) {
@@ -338,6 +396,8 @@ import static com.fastaccess.data.dao.model.Repo.UPDATED_AT;
         this.openIssues = in.readLong();
         this.watchers = in.readLong();
         this.defaultBranch = in.readString();
+        this.topics = new TopicsModel();
+        in.readList(this.topics, this.topics.getClass().getClassLoader());
         this.owner = in.readParcelable(User.class.getClassLoader());
         this.permissions = in.readParcelable(RepoPermissionsModel.class.getClassLoader());
         this.organization = in.readParcelable(User.class.getClassLoader());
@@ -348,6 +408,7 @@ import static com.fastaccess.data.dao.model.Repo.UPDATED_AT;
         this.networkCount = in.readInt();
         this.starredUser = in.readString();
         this.reposOwner = in.readString();
+        this.hasProjects = in.readByte() != 0;
     }
 
     public static final Creator<Repo> CREATOR = new Creator<Repo>() {
@@ -355,15 +416,4 @@ import static com.fastaccess.data.dao.model.Repo.UPDATED_AT;
 
         @Override public Repo[] newArray(int size) {return new Repo[size];}
     };
-
-    @Override public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        AbstractRepo that = (AbstractRepo) o;
-        return id == that.id;
-    }
-
-    @Override public int hashCode() {
-        return (int) (id ^ (id >>> 32));
-    }
 }

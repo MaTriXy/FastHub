@@ -18,7 +18,8 @@ import com.fastaccess.provider.rest.RestProvider;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
-import rx.schedulers.Schedulers;
+import io.reactivex.schedulers.Schedulers;
+
 
 /**
  * Created by Kosh on 12 Mar 2017, 2:25 PM
@@ -49,22 +50,24 @@ public class GithubActionService extends IntentService {
     })
     @Retention(RetentionPolicy.SOURCE) @interface GitActionType {}
 
-
-    public static void startForRepo(@NonNull Context context, @NonNull String login, @NonNull String repo, @GitActionType int type) {
+    public static void startForRepo(@NonNull Context context, @NonNull String login, @NonNull String repo,
+                                    @GitActionType int type, boolean isEnterprise) {
         Intent intent = new Intent(context.getApplicationContext(), GithubActionService.class);
         intent.putExtras(Bundler.start()
                 .put(BundleConstant.ID, repo)
                 .put(BundleConstant.EXTRA, login)
                 .put(BundleConstant.EXTRA_TYPE, type)
+                .put(BundleConstant.IS_ENTERPRISE, isEnterprise)
                 .end());
         context.startService(intent);
     }
 
-    public static void startForGist(@NonNull Context context, @NonNull String id, @GitActionType int type) {
+    public static void startForGist(@NonNull Context context, @NonNull String id, @GitActionType int type, boolean isEnterprise) {
         Intent intent = new Intent(context.getApplicationContext(), GithubActionService.class);
         intent.putExtras(Bundler.start()
                 .put(BundleConstant.ID, id)
                 .put(BundleConstant.EXTRA_TYPE, type)
+                .put(BundleConstant.IS_ENTERPRISE, isEnterprise)
                 .end());
         context.startService(intent);
     }
@@ -79,125 +82,126 @@ public class GithubActionService extends IntentService {
             @GitActionType int type = bundle.getInt(BundleConstant.EXTRA_TYPE);
             String id = bundle.getString(BundleConstant.ID);
             String login = bundle.getString(BundleConstant.EXTRA);
+            boolean isEnterprise = bundle.getBoolean(BundleConstant.IS_ENTERPRISE);
             switch (type) {
                 case FORK_GIST:
-                    forkGist(id);
+                    forkGist(id, isEnterprise);
                     break;
                 case FORK_REPO:
-                    forkRepo(id, login);
+                    forkRepo(id, login, isEnterprise);
                     break;
                 case STAR_GIST:
-                    starGist(id);
+                    starGist(id, isEnterprise);
                     break;
                 case STAR_REPO:
-                    starRepo(id, login);
+                    starRepo(id, login, isEnterprise);
                     break;
                 case UNSTAR_GIST:
-                    unStarGist(id);
+                    unStarGist(id, isEnterprise);
                     break;
                 case UNSTAR_REPO:
-                    unStarRepo(id, login);
+                    unStarRepo(id, login, isEnterprise);
                     break;
                 case UNWATCH_REPO:
-                    unWatchRepo(id, login);
+                    unWatchRepo(id, login, isEnterprise);
                     break;
                 case WATCH_REPO:
-                    watchRepo(id, login);
+                    watchRepo(id, login, isEnterprise);
                     break;
             }
         }
     }
 
-    private void forkGist(@Nullable String id) {
+    private void forkGist(@Nullable String id, boolean isEnterprise) {
         if (id != null) {
             String msg = getString(R.string.forking, getString(R.string.gist));
-            RestProvider.getGistService()
+            RestProvider.getGistService(isEnterprise)
                     .forkGist(id)
-                    .doOnSubscribe(() -> showNotification(msg))
+                    .doOnSubscribe(disposable -> showNotification(msg))
                     .subscribeOn(Schedulers.io())
                     .subscribe(response -> {
                     }, throwable -> hideNotification(msg), () -> hideNotification(msg));
         }
     }
 
-    private void forkRepo(@Nullable String id, @Nullable String login) {
+    private void forkRepo(@Nullable String id, @Nullable String login, boolean isEnterprise) {
         if (id != null && login != null) {
             String msg = getString(R.string.forking, id);
-            RestProvider.getRepoService()
+            RestProvider.getRepoService(isEnterprise)
                     .forkRepo(login, id)
-                    .doOnSubscribe(() -> showNotification(msg))
+                    .doOnSubscribe(disposable -> showNotification(msg))
                     .subscribeOn(Schedulers.io())
                     .subscribe(response -> {
                     }, throwable -> hideNotification(msg), () -> hideNotification(msg));
         }
     }
 
-    private void starGist(@Nullable String id) {
+    private void starGist(@Nullable String id, boolean isEnterprise) {
         if (id != null) {
-            String msg = getString(R.string.staring, getString(R.string.gist));
-            RestProvider.getGistService()
+            String msg = getString(R.string.starring, getString(R.string.gist));
+            RestProvider.getGistService(isEnterprise)
                     .starGist(id)
-                    .doOnSubscribe(() -> showNotification(msg))
+                    .doOnSubscribe(disposable -> showNotification(msg))
                     .subscribeOn(Schedulers.io())
                     .subscribe(response -> {
                     }, throwable -> hideNotification(msg), () -> hideNotification(msg));
         }
     }
 
-    private void starRepo(@Nullable String id, @Nullable String login) {
+    private void starRepo(@Nullable String id, @Nullable String login, boolean isEnterprise) {
         if (id != null && login != null) {
-            String msg = getString(R.string.staring, id);
-            RestProvider.getRepoService()
+            String msg = getString(R.string.starring, id);
+            RestProvider.getRepoService(isEnterprise)
                     .starRepo(login, id)
-                    .doOnSubscribe(() -> showNotification(msg))
+                    .doOnSubscribe(disposable -> showNotification(msg))
                     .subscribeOn(Schedulers.io())
                     .subscribe(response -> {
                     }, throwable -> hideNotification(msg), () -> hideNotification(msg));
         }
     }
 
-    private void unStarGist(@Nullable String id) {
+    private void unStarGist(@Nullable String id, boolean isEnterprise) {
         if (id != null) {
-            String msg = getString(R.string.un_staring, getString(R.string.gist));
-            RestProvider.getGistService()
+            String msg = getString(R.string.un_starring, getString(R.string.gist));
+            RestProvider.getGistService(isEnterprise)
                     .unStarGist(id)
-                    .doOnSubscribe(() -> showNotification(msg))
+                    .doOnSubscribe(disposable -> showNotification(msg))
                     .subscribeOn(Schedulers.io())
                     .subscribe(response -> {
                     }, throwable -> hideNotification(msg), () -> hideNotification(msg));
         }
     }
 
-    private void unStarRepo(@Nullable String id, @Nullable String login) {
+    private void unStarRepo(@Nullable String id, @Nullable String login, boolean isEnterprise) {
         if (id != null && login != null) {
-            String msg = getString(R.string.un_staring, id);
-            RestProvider.getRepoService()
+            String msg = getString(R.string.un_starring, id);
+            RestProvider.getRepoService(isEnterprise)
                     .unstarRepo(login, id)
-                    .doOnSubscribe(() -> showNotification(msg))
+                    .doOnSubscribe(disposable -> showNotification(msg))
                     .subscribeOn(Schedulers.io())
                     .subscribe(response -> {
                     }, throwable -> hideNotification(msg), () -> hideNotification(msg));
         }
     }
 
-    private void unWatchRepo(@Nullable String id, @Nullable String login) {
+    private void unWatchRepo(@Nullable String id, @Nullable String login, boolean isEnterprise) {
         if (id != null && login != null) {
             String msg = getString(R.string.un_watching, id);
-            RestProvider.getRepoService()
+            RestProvider.getRepoService(isEnterprise)
                     .unwatchRepo(login, id)
-                    .doOnSubscribe(() -> showNotification(msg))
+                    .doOnSubscribe(disposable -> showNotification(msg))
                     .subscribeOn(Schedulers.io())
                     .subscribe(response -> {
                     }, throwable -> hideNotification(msg), () -> hideNotification(msg));
         }
     }
 
-    private void watchRepo(@Nullable String id, @Nullable String login) {
+    private void watchRepo(@Nullable String id, @Nullable String login, boolean isEnterprise) {
         if (id != null && login != null) {
             String msg = getString(R.string.watching, id);
-            RestProvider.getRepoService()
+            RestProvider.getRepoService(isEnterprise)
                     .watchRepo(login, id)
-                    .doOnSubscribe(() -> showNotification(msg))
+                    .doOnSubscribe(disposable -> showNotification(msg))
                     .subscribeOn(Schedulers.io())
                     .subscribe(response -> {
                     }, throwable -> hideNotification(msg), () -> hideNotification(msg));
@@ -206,7 +210,7 @@ public class GithubActionService extends IntentService {
 
     private NotificationCompat.Builder getNotification(@NonNull String title) {
         if (notification == null) {
-            notification = new NotificationCompat.Builder(this)
+            notification = new NotificationCompat.Builder(this, title)
                     .setSmallIcon(R.drawable.ic_sync)
                     .setProgress(0, 100, true);
         }

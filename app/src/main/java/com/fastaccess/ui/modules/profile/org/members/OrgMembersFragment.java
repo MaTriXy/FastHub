@@ -16,6 +16,7 @@ import com.fastaccess.ui.adapter.UsersAdapter;
 import com.fastaccess.ui.base.BaseFragment;
 import com.fastaccess.ui.widgets.StateLayout;
 import com.fastaccess.ui.widgets.recyclerview.DynamicRecyclerView;
+import com.fastaccess.ui.widgets.recyclerview.scroll.RecyclerViewFastScroller;
 
 import java.util.List;
 
@@ -30,6 +31,7 @@ public class OrgMembersFragment extends BaseFragment<OrgMembersMvp.View, OrgMemb
     @BindView(R.id.recycler) DynamicRecyclerView recycler;
     @BindView(R.id.refresh) SwipeRefreshLayout refresh;
     @BindView(R.id.stateLayout) StateLayout stateLayout;
+    @BindView(R.id.fastScroller) RecyclerViewFastScroller fastScroller;
     private OnLoadMore<String> onLoadMore;
     private UsersAdapter adapter;
 
@@ -64,7 +66,7 @@ public class OrgMembersFragment extends BaseFragment<OrgMembersMvp.View, OrgMemb
         stateLayout.setOnReloadListener(this);
         refresh.setOnRefreshListener(this);
         recycler.setEmptyView(stateLayout, refresh);
-        getLoadMore().setCurrent_page(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
+        getLoadMore().initialize(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
         adapter = new UsersAdapter(getPresenter().getFollowers());
         adapter.setListener(getPresenter());
         recycler.setAdapter(adapter);
@@ -73,6 +75,7 @@ public class OrgMembersFragment extends BaseFragment<OrgMembersMvp.View, OrgMemb
         if (getPresenter().getFollowers().isEmpty() && !getPresenter().isApiCalled()) {
             onRefresh();
         }
+        fastScroller.attachRecyclerView(recycler);
     }
 
     @NonNull @Override public OrgMembersPresenter providePresenter() {
@@ -80,6 +83,8 @@ public class OrgMembersFragment extends BaseFragment<OrgMembersMvp.View, OrgMemb
     }
 
     @Override public void showProgress(@StringRes int resId) {
+
+        refresh.setRefreshing(true);
         stateLayout.showProgress();
     }
 
@@ -111,6 +116,11 @@ public class OrgMembersFragment extends BaseFragment<OrgMembersMvp.View, OrgMemb
 
     @Override public void onClick(View view) {
         onRefresh();
+    }
+
+    @Override public void onScrollTop(int index) {
+        super.onScrollTop(index);
+        if (recycler != null) recycler.scrollToPosition(0);
     }
 
     private void showReload() {

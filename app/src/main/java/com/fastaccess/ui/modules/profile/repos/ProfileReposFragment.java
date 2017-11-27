@@ -16,6 +16,7 @@ import com.fastaccess.ui.adapter.ReposAdapter;
 import com.fastaccess.ui.base.BaseFragment;
 import com.fastaccess.ui.widgets.StateLayout;
 import com.fastaccess.ui.widgets.recyclerview.DynamicRecyclerView;
+import com.fastaccess.ui.widgets.recyclerview.scroll.RecyclerViewFastScroller;
 
 import java.util.List;
 
@@ -25,11 +26,13 @@ import butterknife.BindView;
  * Created by Kosh on 03 Dec 2016, 3:56 PM
  */
 
-public class ProfileReposFragment extends BaseFragment<ProfileReposMvp.View, ProfileReposPresenter> implements ProfileReposMvp.View {
+public class ProfileReposFragment extends BaseFragment<ProfileReposMvp.View, ProfileReposPresenter> implements ProfileReposMvp.View,
+        ProfileReposFilterBottomSheetDialog.ProfileReposFilterChangeListener {
 
     @BindView(R.id.recycler) DynamicRecyclerView recycler;
     @BindView(R.id.refresh) SwipeRefreshLayout refresh;
     @BindView(R.id.stateLayout) StateLayout stateLayout;
+    @BindView(R.id.fastScroller) RecyclerViewFastScroller fastScroller;
     private OnLoadMore<String> onLoadMore;
     private ReposAdapter adapter;
 
@@ -53,7 +56,7 @@ public class ProfileReposFragment extends BaseFragment<ProfileReposMvp.View, Pro
     }
 
     @Override protected int fragmentLayout() {
-        return R.layout.small_grid_refresh_list;
+        return R.layout.micro_grid_refresh_list;
     }
 
     @Override protected void onFragmentCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
@@ -64,7 +67,7 @@ public class ProfileReposFragment extends BaseFragment<ProfileReposMvp.View, Pro
         stateLayout.setOnReloadListener(this);
         refresh.setOnRefreshListener(this);
         recycler.setEmptyView(stateLayout, refresh);
-        getLoadMore().setCurrent_page(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
+        getLoadMore().initialize(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
         adapter = new ReposAdapter(getPresenter().getRepos(), false);
         adapter.setListener(getPresenter());
         recycler.setAdapter(adapter);
@@ -73,6 +76,7 @@ public class ProfileReposFragment extends BaseFragment<ProfileReposMvp.View, Pro
         if (getPresenter().getRepos().isEmpty() && !getPresenter().isApiCalled()) {
             onRefresh();
         }
+        fastScroller.attachRecyclerView(recycler);
     }
 
     @NonNull @Override public ProfileReposPresenter providePresenter() {
@@ -80,6 +84,8 @@ public class ProfileReposFragment extends BaseFragment<ProfileReposMvp.View, Pro
     }
 
     @Override public void showProgress(@StringRes int resId) {
+
+        refresh.setRefreshing(true);
 
         stateLayout.showProgress();
     }
@@ -99,16 +105,16 @@ public class ProfileReposFragment extends BaseFragment<ProfileReposMvp.View, Pro
         super.showMessage(titleRes, msgRes);
     }
 
-    private void showReload() {
-        hideProgress();
-        stateLayout.showReload(adapter.getItemCount());
-    }
-
     @NonNull @Override public OnLoadMore<String> getLoadMore() {
         if (onLoadMore == null) {
             onLoadMore = new OnLoadMore<>(getPresenter(), getArguments().getString(BundleConstant.EXTRA));
         }
         return onLoadMore;
+    }
+
+    @Override public void onRepoFilterClicked() {
+        ProfileReposFilterBottomSheetDialog.newInstance(getPresenter().getFilterOptions())
+                .show(getChildFragmentManager(), "ProfileReposFilterBottomSheetDialog");
     }
 
     @Override public void onRefresh() {
@@ -117,5 +123,40 @@ public class ProfileReposFragment extends BaseFragment<ProfileReposMvp.View, Pro
 
     @Override public void onClick(View view) {
         onRefresh();
+    }
+
+    @Override public void onScrollTop(int index) {
+        super.onScrollTop(index);
+        if (recycler != null) recycler.scrollToPosition(0);
+    }
+
+    private void showReload() {
+        hideProgress();
+        stateLayout.showReload(adapter.getItemCount());
+    }
+
+    @Override
+    public void onFilterApply() {
+        getPresenter().onFilterApply();
+    }
+
+    @Override
+    public void onTypeSelected(String selectedType) {
+        getPresenter().onTypeSelected(selectedType);
+    }
+
+    @Override
+    public void onSortOptionSelected(String selectedSortOption) {
+        getPresenter().onSortOptionSelected(selectedSortOption);
+    }
+
+    @Override
+    public void onSortDirectionSelected(String selectedSortDirection) {
+        getPresenter().onSortDirectionSelected(selectedSortDirection);
+    }
+
+    @Override
+    public String getLogin() {
+        return getArguments().getString(BundleConstant.EXTRA);
     }
 }

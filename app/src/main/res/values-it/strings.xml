@@ -12,7 +12,6 @@
     <string name="sign_in">Accedi</string>
     <string name="share">Condividi</string>
     <string name="reload">Ricarica</string>
-    <string name="feeds">Attività</string>
     <string name="profile">Profilo</string>
     <string name="error">Errore</string>
     <string name="press_again_to_exit">Premi nuovamente per uscire</string>
@@ -193,6 +192,7 @@
     <string name="background_job_title">Intervallo sincronizzazione delle notifiche</string>
     <string name="every">Ogni</string>
     <string name="behavior">Comportamento</string>
+    <string name="customization">Personalizzazione</string>
     <string name="recycler_view_animation_summary">Abilita animazioni delle liste</string>
     <string name="recycler_view_animation_title">Animazione lista</string>
     <string name="back_button_summary">Disabilita il dialogo che previene una chiusura accidentale dell\'app</string>
@@ -229,6 +229,8 @@
     <string name="mark_notification_summary">Premendo su una notifica non la segnerà come letta.</string>
     <string name="theme_title">Scegli un tema</string>
     <string name="theme_summary">Scegli il tuo tema predefinito</string>
+    <string name="theme_color_summary">Scegli il colore di evidenza</string>
+    <string name="theme_color_title">Colore evidenziatore</string>
     <string name="website">Sito Web</string>
     <string name="support_development">Supporta lo sviluppo</string>
     <string name="success_purchase_message">Grazie di essere così estremamente fantastico!</string>
@@ -325,6 +327,7 @@
     <string name="support_with_10_00">Supporta con $10.00</string>
     <string name="support_with_20_00">Supporta con $20.00</string>
     <string name="app_language">Lingua app</string>
+    <string name="language">Lingua</string>
     <string name="choose_language_title">Scegli la lingua</string>
     <string name="choose_language_summary">Scegli la tua lingua preferita</string>
     <string name="un_subscribe">Disiscriviti</string>

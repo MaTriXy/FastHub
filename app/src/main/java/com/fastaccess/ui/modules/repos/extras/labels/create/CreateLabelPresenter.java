@@ -19,15 +19,13 @@ public class CreateLabelPresenter extends BasePresenter<CreateLabelMvp.View> imp
         }
     }
 
-    @Override public void onItemLongClick(int position, View v, String item) {
-        onItemClick(position, v, item);
-    }
+    @Override public void onItemLongClick(int position, View v, String item) {}
 
     @Override public void onSubmitLabel(@NonNull String name, @NonNull String color, @NonNull String repo, @NonNull String login) {
         LabelModel labelModel = new LabelModel();
         labelModel.setColor(color.replaceAll("#", ""));
         labelModel.setName(name);
-        makeRestCall(RestProvider.getRepoService()
+        makeRestCall(RestProvider.getRepoService(isEnterprise())
                         .addLabel(login, repo, labelModel),
                 labelModel1 -> sendToView(view -> view.onSuccessfullyCreated(labelModel1)));
     }

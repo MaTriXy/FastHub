@@ -4,6 +4,7 @@ import android.os.Parcel;
 import android.os.Parcelable;
 import android.support.annotation.NonNull;
 
+import com.annimon.stream.Collectors;
 import com.annimon.stream.LongStream;
 import com.annimon.stream.Stream;
 import com.fastaccess.App;
@@ -19,22 +20,27 @@ import com.google.gson.annotations.SerializedName;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 
+import io.reactivex.Observable;
+import io.reactivex.Single;
+import io.reactivex.disposables.Disposable;
+import io.requery.BlockingEntityStore;
 import io.requery.Column;
 import io.requery.Convert;
 import io.requery.Entity;
 import io.requery.Key;
 import io.requery.Persistable;
-import io.requery.rx.SingleEntityStore;
 import lombok.NoArgsConstructor;
-import rx.Observable;
-import rx.Single;
+
+import static com.fastaccess.data.dao.model.Gist.ID;
+import static com.fastaccess.data.dao.model.Gist.OWNER_NAME;
 
 /**
  * Created by Kosh on 16 Mar 2017, 7:32 PM
  */
 
-@Entity @NoArgsConstructor public abstract class AbstractGist implements Parcelable {
+@Entity() @NoArgsConstructor public abstract class AbstractGist implements Parcelable {
     @SerializedName("nooope") @Key long id;
     String url;
     String forksUrl;
@@ -55,57 +61,58 @@ import rx.Single;
     @Column(name = "user_column") @Convert(UserConverter.class) User user;
     @Convert(UserConverter.class) User owner;
 
-    public Single save(Gist modelEntity) {
-        return App.getInstance().getDataStore()
-                .delete(Gist.class)
-                .where(Gist.ID.eq(modelEntity.getId()))
-                .get()
-                .toSingle()
-                .flatMap(integer -> App.getInstance().getDataStore().insert(modelEntity));
+    public static Disposable save(@NonNull List<Gist> models, @NonNull String ownerName) {
+        return RxHelper.getSingle(Single.fromPublisher(s -> {
+            try {
+                Login login = Login.getUser();
+                if (login != null) {
+                    if (login.getLogin().equalsIgnoreCase(ownerName)) {
+                        BlockingEntityStore<Persistable> dataSource = App.getInstance().getDataStore().toBlocking();
+                        dataSource.delete(Gist.class)
+                                .where(Gist.OWNER_NAME.equal(ownerName))
+                                .get()
+                                .value();
+                        if (!models.isEmpty()) {
+                            for (Gist gistModel : models) {
+                                dataSource.delete(Gist.class).where(ID.eq(gistModel.getId())).get().value();
+                                gistModel.setOwnerName(ownerName);
+                                dataSource.insert(gistModel);
+                            }
+                        }
+                    } else {
+                        App.getInstance().getDataStore().toBlocking()
+                                .delete(Gist.class)
+                                .where(Gist.OWNER_NAME.notEqual(ownerName)
+                                        .or(OWNER_NAME.isNull()))
+                                .get()
+                                .value();
+                    }
+                }
+                s.onNext("");
+            } catch (Exception e) {
+                s.onError(e);
+            }
+            s.onComplete();
+        })).subscribe(o -> {/*donothing*/}, Throwable::printStackTrace);
     }
 
-    public static Observable save(@NonNull List<Gist> gists) {
-        SingleEntityStore<Persistable> singleEntityStore = App.getInstance().getDataStore();
-        return RxHelper.safeObservable(singleEntityStore.delete(Gist.class)
-                .where(Gist.OWNER_NAME.isNull())
-                .get()
-                .toSingle()
-                .toObservable()
-                .flatMap(integer -> Observable.from(gists))
-                .flatMap(gist -> singleEntityStore.insert(gist).toObservable()));
-    }
-
-    public static Observable save(@NonNull List<Gist> gists, @NonNull String ownerName) {
-        SingleEntityStore<Persistable> singleEntityStore = App.getInstance().getDataStore();
-        return RxHelper.safeObservable(singleEntityStore.delete(Gist.class)
-                .where(Gist.OWNER_NAME.equal(ownerName))
-                .get()
-                .toSingle()
-                .toObservable()
-                .flatMap(integer -> Observable.from(gists))
-                .flatMap(gist -> {
-                    gist.setOwnerName(ownerName);
-                    return gist.save(gist).toObservable();
-                }));
-    }
-
-    @NonNull public static Observable<List<Gist>> getMyGists(@NonNull String ownerName) {
+    @NonNull public static Single<List<Gist>> getMyGists(@NonNull String ownerName) {
         return App.getInstance()
                 .getDataStore()
                 .select(Gist.class)
                 .where(Gist.OWNER_NAME.equal(ownerName))
                 .get()
-                .toObservable()
+                .observable()
                 .toList();
     }
 
-    @NonNull public static Observable<List<Gist>> getGists() {
+    @NonNull public static Single<List<Gist>> getGists() {
         return App.getInstance()
                 .getDataStore()
                 .select(Gist.class)
                 .where(Gist.OWNER_NAME.isNull())
                 .get()
-                .toObservable()
+                .observable()
                 .toList();
     }
 
@@ -115,7 +122,7 @@ import rx.Single;
                 .select(Gist.class)
                 .where(Gist.GIST_ID.eq(gistId))
                 .get()
-                .toObservable();
+                .observable();
     }
 
     @Override public boolean equals(Object o) {
@@ -129,12 +136,13 @@ import rx.Single;
         return url != null ? url.hashCode() : 0;
     }
 
-    @NonNull public List<FilesListModel> getFilesAsList() {
-        List<FilesListModel> models = new ArrayList<>();
+    @NonNull public ArrayList<FilesListModel> getFilesAsList() {
         if (files != null) {
-            models.addAll(files.values());
+            return Stream.of(files)
+                    .map(Map.Entry::getValue)
+                    .collect(Collectors.toCollection(ArrayList::new));
         }
-        return models;
+        return new ArrayList<>();
     }
 
     @NonNull public SpannableBuilder getDisplayTitle(boolean isFromProfile) {
@@ -171,7 +179,16 @@ import rx.Single;
             spannableBuilder.append(description);
         }
         if (InputHelper.isEmpty(spannableBuilder.toString())) {
-            if (isFromProfile) spannableBuilder.bold("N/A");
+            if (isFromProfile) {
+                List<FilesListModel> files = getFilesAsList();
+                if (!files.isEmpty()) {
+                    FilesListModel filesListModel = files.get(0);
+                    if (!InputHelper.isEmpty(filesListModel.getFilename()) && filesListModel.getFilename().trim().length() > 2) {
+                        spannableBuilder.append(" ")
+                                .append(filesListModel.getFilename());
+                    }
+                }
+            }
         }
         return spannableBuilder;
     }

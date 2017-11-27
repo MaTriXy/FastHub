@@ -21,7 +21,7 @@ import retrofit2.http.POST;
 import retrofit2.http.PUT;
 import retrofit2.http.Path;
 import retrofit2.http.Query;
-import rx.Observable;
+import io.reactivex.Observable;
 
 /**
  * Created by Kosh on 15 Dec 2016, 10:21 PM
@@ -73,6 +73,7 @@ public interface PullRequestService {
                                       @Body IssueRequestModel issue);
 
     @POST("repos/{owner}/{repo}/issues/{number}/assignees")
+    @Headers("Accept: application/vnd.github.VERSION.full+json, application/vnd.github.squirrel-girl-preview")
     Observable<PullRequest> putAssignees(@Path("owner") String owner, @Path("repo") String repo,
                                          @Path("number") int number, @Body AssigneesRequestModel body);
 
@@ -83,5 +84,4 @@ public interface PullRequestService {
     @Headers("Accept: application/vnd.github.black-cat-preview+json")
     Observable<PullRequest> putReviewers(@Path("owner") String owner, @Path("repo") String repo,
                                          @Path("number") int number, @Body AssigneesRequestModel body);
-
 }

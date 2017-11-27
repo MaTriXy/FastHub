@@ -47,7 +47,7 @@ class ProfileFollowingPresenter extends BasePresenter<ProfileFollowingMvp.View> 
         super.onError(throwable);
     }
 
-    @Override public void onCallApi(int page, @Nullable String parameter) {
+    @Override public boolean onCallApi(int page, @Nullable String parameter) {
         if (parameter == null) {
             throw new NullPointerException("Username is null");
         }
@@ -58,16 +58,17 @@ class ProfileFollowingPresenter extends BasePresenter<ProfileFollowingMvp.View> 
         setCurrentPage(page);
         if (page > lastPage || lastPage == 0) {
             sendToView(ProfileFollowingMvp.View::hideProgress);
-            return;
+            return false;
         }
-        makeRestCall(RestProvider.getUserService().getFollowing(parameter, page),
+        makeRestCall(RestProvider.getUserService(isEnterprise()).getFollowing(parameter, page),
                 response -> {
                     lastPage = response.getLast();
                     if (getCurrentPage() == 1) {
-                        manageSubscription(User.saveUserFollowingList(response.getItems(), parameter).subscribe());
+                        manageDisposable(User.saveUserFollowingList(response.getItems(), parameter));
                     }
                     sendToView(view -> view.onNotifyAdapter(response.getItems(), page));
                 });
+        return true;
     }
 
     @NonNull @Override public ArrayList<User> getFollowing() {
@@ -76,7 +77,7 @@ class ProfileFollowingPresenter extends BasePresenter<ProfileFollowingMvp.View> 
 
     @Override public void onWorkOffline(@NonNull String login) {
         if (users.isEmpty()) {
-            manageSubscription(RxHelper.getObserver(User.getUserFollowingList(login)).subscribe(userModels ->
+            manageDisposable(RxHelper.getSingle(User.getUserFollowingList(login)).subscribe(userModels ->
                     sendToView(view -> view.onNotifyAdapter(userModels, 1))));
         } else {
             sendToView(ProfileFollowingMvp.View::hideProgress);

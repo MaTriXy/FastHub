@@ -16,8 +16,6 @@ import com.fastaccess.helper.ActivityHelper;
 import com.fastaccess.helper.BundleConstant;
 import com.fastaccess.helper.Bundler;
 import com.fastaccess.helper.InputHelper;
-import com.fastaccess.helper.Logger;
-import com.fastaccess.helper.PrefGetter;
 import com.fastaccess.provider.rest.RestProvider;
 import com.fastaccess.provider.rest.loadmore.OnLoadMore;
 import com.fastaccess.ui.adapter.ReleasesAdapter;
@@ -26,12 +24,12 @@ import com.fastaccess.ui.widgets.StateLayout;
 import com.fastaccess.ui.widgets.dialog.ListDialogView;
 import com.fastaccess.ui.widgets.dialog.MessageDialogView;
 import com.fastaccess.ui.widgets.recyclerview.DynamicRecyclerView;
+import com.fastaccess.ui.widgets.recyclerview.scroll.RecyclerViewFastScroller;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import butterknife.BindView;
-import uk.co.samuelwall.materialtaptargetprompt.MaterialTapTargetPrompt;
 
 /**
  * Created by Kosh on 03 Dec 2016, 3:56 PM
@@ -41,6 +39,7 @@ public class RepoReleasesFragment extends BaseFragment<RepoReleasesMvp.View, Rep
     @BindView(R.id.recycler) DynamicRecyclerView recycler;
     @BindView(R.id.refresh) SwipeRefreshLayout refresh;
     @BindView(R.id.stateLayout) StateLayout stateLayout;
+    @BindView(R.id.fastScroller) RecyclerViewFastScroller fastScroller;
     private OnLoadMore onLoadMore;
     private ReleasesAdapter adapter;
 
@@ -49,6 +48,17 @@ public class RepoReleasesFragment extends BaseFragment<RepoReleasesMvp.View, Rep
         view.setArguments(Bundler.start()
                 .put(BundleConstant.ID, repoId)
                 .put(BundleConstant.EXTRA, login)
+                .end());
+        return view;
+    }
+
+    public static RepoReleasesFragment newInstance(@NonNull String repoId, @NonNull String login, @Nullable String tag, long id) {
+        RepoReleasesFragment view = new RepoReleasesFragment();
+        view.setArguments(Bundler.start()
+                .put(BundleConstant.ID, repoId)
+                .put(BundleConstant.EXTRA, login)
+                .put(BundleConstant.EXTRA_TWO, id)
+                .put(BundleConstant.EXTRA_THREE, tag)
                 .end());
         return view;
     }
@@ -81,7 +91,7 @@ public class RepoReleasesFragment extends BaseFragment<RepoReleasesMvp.View, Rep
         recycler.addDivider();
         adapter = new ReleasesAdapter(getPresenter().getReleases());
         adapter.setListener(getPresenter());
-        getLoadMore().setCurrent_page(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
+        getLoadMore().initialize(getPresenter().getCurrentPage(), getPresenter().getPreviousTotal());
         recycler.setAdapter(adapter);
         recycler.addOnScrollListener(getLoadMore());
         if (savedInstanceState == null) {
@@ -89,22 +99,7 @@ public class RepoReleasesFragment extends BaseFragment<RepoReleasesMvp.View, Rep
         } else if (getPresenter().getReleases().isEmpty() && !getPresenter().isApiCalled()) {
             onRefresh();
         }
-    }
-
-    @Override public void setUserVisibleHint(boolean isVisibleToUser) {
-        super.setUserVisibleHint(isVisibleToUser);
-        if (isVisibleToUser && adapter != null) {
-            if (!PrefGetter.isReleaseHintShow()) {
-                adapter.setGuideListener((itemView, model) ->
-                        new MaterialTapTargetPrompt.Builder(getActivity())
-                                .setTarget(itemView.findViewById(R.id.download))
-                                .setPrimaryText(R.string.download)
-                                .setSecondaryText(R.string.click_here_to_download_release_hint)
-                                .setCaptureTouchEventOutsidePrompt(true)
-                                .show());
-                adapter.notifyDataSetChanged();// call it notify the adapter to show the guide immediately.
-            }
-        }
+        fastScroller.attachRecyclerView(recycler);
     }
 
     @NonNull @Override public RepoReleasesPresenter providePresenter() {
@@ -119,6 +114,8 @@ public class RepoReleasesFragment extends BaseFragment<RepoReleasesMvp.View, Rep
     }
 
     @Override public void showProgress(@StringRes int resId) {
+
+        refresh.setRefreshing(true);
 
         stateLayout.showProgress();
     }
@@ -164,7 +161,7 @@ public class RepoReleasesFragment extends BaseFragment<RepoReleasesMvp.View, Rep
     @Override public void onShowDetails(@NonNull Release item) {
         if (!InputHelper.isEmpty(item.getBody())) {
             MessageDialogView.newInstance(!InputHelper.isEmpty(item.getName()) ? item.getName() : item.getTagName(),
-                    item.getBody(), true).show(getChildFragmentManager(), MessageDialogView.TAG);
+                    item.getBody(), true, false).show(getChildFragmentManager(), MessageDialogView.TAG);
         } else {
             showErrorMessage(getString(R.string.no_body));
         }
@@ -179,10 +176,14 @@ public class RepoReleasesFragment extends BaseFragment<RepoReleasesMvp.View, Rep
     }
 
     @Override public void onItemSelected(SimpleUrlsModel item) {
-        Logger.e(item, item.getUrl());
         if (ActivityHelper.checkAndRequestReadWritePermission(getActivity())) {
             RestProvider.downloadFile(getContext(), item.getUrl());
         }
+    }
+
+    @Override public void onScrollTop(int index) {
+        super.onScrollTop(index);
+        if (recycler != null) recycler.scrollToPosition(0);
     }
 
     private void showReload() {

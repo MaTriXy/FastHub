@@ -21,8 +21,8 @@ import com.fastaccess.helper.PrefGetter;
 import com.fastaccess.provider.rest.RestProvider;
 import com.fastaccess.provider.scheme.SchemeParser;
 
-import rx.Observable;
-import rx.schedulers.Schedulers;
+import io.reactivex.Observable;
+import io.reactivex.schedulers.Schedulers;
 
 /**
  * Created by Kosh on 11 Mar 2017, 12:13 AM
@@ -106,9 +106,9 @@ public class ReadNotificationService extends IntentService {
     }
 
     private void unSubscribeFromThread(long id) {
-        RestProvider.getNotificationService()
+        RestProvider.getNotificationService(PrefGetter.isEnterprise())
                 .unSubscribe(id)
-                .doOnSubscribe(() -> notify(id, getNotification().build()))
+                .doOnSubscribe(disposable -> notify(id, getNotification().build()))
                 .subscribeOn(Schedulers.io())
                 .flatMap(notification1 -> Observable.create(subscriber -> markSingleAsRead(id)))
                 .subscribe(booleanResponse -> cancel(id), throwable -> cancel(id));
@@ -117,10 +117,14 @@ public class ReadNotificationService extends IntentService {
     private void openNotification(long id, @Nullable String url, boolean readOnly) {
         if (id > 0 && url != null) {
             AppHelper.cancelNotification(this, InputHelper.getSafeIntId(id));
-            if (!PrefGetter.isMarkAsReadEnabled() || readOnly) {
+            if (readOnly) {
+                markSingleAsRead(id);
+            } else if (!PrefGetter.isMarkAsReadEnabled()) {
                 markSingleAsRead(id);
             }
-            if (!readOnly) SchemeParser.launchUri(getApplicationContext(), Uri.parse(url), true, true);
+            if (!readOnly) {
+                SchemeParser.launchUri(getApplicationContext(), Uri.parse(url), true, true);
+            }
         }
     }
 
@@ -131,19 +135,17 @@ public class ReadNotificationService extends IntentService {
     }
 
     private void markSingleAsRead(long id) {
-        com.fastaccess.data.dao.model.Notification.markAsRead(id)
-                .onErrorComplete()
-                .subscribe();
-        RestProvider.getNotificationService()
+        com.fastaccess.data.dao.model.Notification.markAsRead(id);
+        RestProvider.getNotificationService(PrefGetter.isEnterprise())
                 .markAsRead(String.valueOf(id))
-                .doOnSubscribe(() -> notify(id, getNotification().build()))
+                .doOnSubscribe(disposable -> notify(id, getNotification().build()))
                 .subscribeOn(Schedulers.io())
                 .subscribe(booleanResponse -> cancel(id), throwable -> cancel(id));
     }
 
     private NotificationCompat.Builder getNotification() {
         if (notification == null) {
-            notification = new NotificationCompat.Builder(this)
+            notification = new NotificationCompat.Builder(this, "read-notification")
                     .setContentTitle(getString(R.string.marking_as_read))
                     .setSmallIcon(R.drawable.ic_sync)
                     .setProgress(0, 100, true);

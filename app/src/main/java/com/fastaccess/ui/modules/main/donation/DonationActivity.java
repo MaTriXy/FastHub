@@ -1,8 +1,8 @@
 package com.fastaccess.ui.modules.main.donation;
 
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.design.widget.AppBarLayout;
+import androidx.annotation.NonNull;
+import com.google.android.material.appbar.AppBarLayout;
 import android.view.View;
 
 import com.fastaccess.App;
@@ -79,7 +79,7 @@ public class DonationActivity extends BaseActivity {
 
     private void onProceed(@NonNull String productKey) {
         if (AppHelper.isGoogleAvailable(this)) {
-            DonateActivity.Companion.start(this, productKey);
+            DonateActivity.Companion.start(this, productKey, null, null);
         } else {
             showErrorMessage(getString(R.string.google_play_service_error));
         }

@@ -4,16 +4,13 @@ import android.app.DownloadManager;
 import android.content.Context;
 import android.net.Uri;
 import android.os.Environment;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.widget.Toast;
+import android.text.TextUtils;
 
-import com.fastaccess.App;
+import com.crashlytics.android.Crashlytics;
 import com.fastaccess.BuildConfig;
 import com.fastaccess.R;
 import com.fastaccess.data.dao.GitHubErrorResponse;
 import com.fastaccess.data.dao.GitHubStatusModel;
-import com.fastaccess.data.dao.NameParser;
 import com.fastaccess.data.service.ContentService;
 import com.fastaccess.data.service.GistService;
 import com.fastaccess.data.service.IssueService;
@@ -41,6 +38,8 @@ import com.google.gson.GsonBuilder;
 import java.io.File;
 import java.lang.reflect.Modifier;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import io.reactivex.Observable;
 import okhttp3.OkHttpClient;
 import okhttp3.ResponseBody;
@@ -48,6 +47,7 @@ import okhttp3.logging.HttpLoggingInterceptor;
 import retrofit2.HttpException;
 import retrofit2.Retrofit;
 import retrofit2.adapter.rxjava2.RxJava2CallAdapterFactory;
+import tech.linjiang.pandora.Pandora;
 
 /**
  * Created by Kosh on 08 Feb 2017, 8:37 PM
@@ -76,6 +76,7 @@ public class RestProvider {
             client.addInterceptor(new AuthenticationInterceptor());
             client.addInterceptor(new PaginationInterceptor());
             client.addInterceptor(new ContentTypeInterceptor());
+            client.addInterceptor(Pandora.get().getInterceptor());
             okHttpClient = client.build();
         }
         return okHttpClient;
@@ -91,46 +92,41 @@ public class RestProvider {
     }
 
     public static void downloadFile(@NonNull Context context, @NonNull String url) {
-        if (InputHelper.isEmpty(url)) return;
-        boolean isEnterprise = LinkParserHelper.isEnterprise(url);
-        Uri uri = Uri.parse(url);
-        DownloadManager downloadManager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
-        DownloadManager.Request request = new DownloadManager.Request(uri);
-        if (isEnterprise) {
-            String authToken = PrefGetter.getEnterpriseToken();
-            request.addRequestHeader("Authorization", authToken.startsWith("Basic") ? authToken : "token " + authToken);
-        }
-        File direct = new File(Environment.getExternalStorageDirectory() + File.separator + context.getString(R.string.app_name));
-        if (!direct.isDirectory() || !direct.exists()) {
-            boolean isCreated = direct.mkdirs();
-            if (!isCreated) {
-                Toast.makeText(App.getInstance(), "Unable to create directory to download file", Toast.LENGTH_SHORT).show();
-                return;
+        downloadFile(context, url, null);
+    }
+
+    public static void downloadFile(@NonNull Context context, @NonNull String url, @Nullable String extension) {
+        try {
+            if (InputHelper.isEmpty(url)) return;
+            boolean isEnterprise = LinkParserHelper.isEnterprise(url);
+            Uri uri = Uri.parse(url);
+            DownloadManager downloadManager = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
+            DownloadManager.Request request = new DownloadManager.Request(uri);
+            String authToken = isEnterprise ? PrefGetter.getEnterpriseToken() : PrefGetter.getToken();
+            if (!TextUtils.isEmpty(authToken)) {
+                request.addRequestHeader("Authorization", authToken.startsWith("Basic") ? authToken : "token " + authToken);
             }
-        }
-        String fileName = "";
-        NameParser nameParser = new NameParser(url);
-        if (nameParser.getUsername() != null) {
-            fileName += nameParser.getUsername() + "_";
-        }
-        if (nameParser.getName() != null) {
-            fileName += nameParser.getName() + "_";
-        }
-        fileName += new File(url).getName();
-        request.setDestinationInExternalPublicDir(context.getString(R.string.app_name), fileName);
-        request.setTitle(fileName);
-        request.setDescription(context.getString(R.string.downloading_file));
-        request.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_MOBILE | DownloadManager.Request.NETWORK_WIFI);
-        request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-        if (downloadManager != null) {
-            downloadManager.enqueue(request);
+            String fileName = new File(url).getName();
+            if (!InputHelper.isEmpty(extension)) {
+                fileName += extension;
+            }
+            request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName);
+            request.setTitle(fileName);
+            request.setDescription(context.getString(R.string.downloading_file));
+            request.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_MOBILE | DownloadManager.Request.NETWORK_WIFI);
+            request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            if (downloadManager != null) {
+                downloadManager.enqueue(request);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            Crashlytics.logException(e);
         }
     }
 
     public static int getErrorCode(Throwable throwable) {
         if (throwable instanceof HttpException) {
             return ((HttpException) throwable).code();
-
         }
         return -1;
     }
@@ -216,7 +212,7 @@ public class RestProvider {
 
     @NonNull public static Observable<GitHubStatusModel> gitHubStatus() {
         return new Retrofit.Builder()
-                .baseUrl("https://status.github.com/")
+                .baseUrl("https://kctbh9vrtdwd.statuspage.io/")
                 .client(provideOkHttpClient())
                 .addConverterFactory(new GithubResponseConverter(gson))
                 .addCallAdapterFactory(RxJava2CallAdapterFactory.create())

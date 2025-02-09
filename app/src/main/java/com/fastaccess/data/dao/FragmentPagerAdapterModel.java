@@ -1,9 +1,9 @@
 package com.fastaccess.data.dao;
 
 import android.content.Context;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.v4.app.Fragment;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
 
 import com.annimon.stream.Collectors;
 import com.annimon.stream.Stream;
@@ -18,10 +18,15 @@ import com.fastaccess.ui.modules.feeds.FeedsFragment;
 import com.fastaccess.ui.modules.gists.GistsFragment;
 import com.fastaccess.ui.modules.gists.gist.comments.GistCommentsFragment;
 import com.fastaccess.ui.modules.gists.gist.files.GistFilesListFragment;
+import com.fastaccess.ui.modules.gists.starred.StarredGistsFragment;
+import com.fastaccess.ui.modules.main.drawer.AccountDrawerFragment;
+import com.fastaccess.ui.modules.main.drawer.MainDrawerFragment;
 import com.fastaccess.ui.modules.main.issues.MyIssuesFragment;
 import com.fastaccess.ui.modules.main.pullrequests.MyPullRequestFragment;
 import com.fastaccess.ui.modules.notification.all.AllNotificationsFragment;
+import com.fastaccess.ui.modules.notification.fasthub.FastHubNotificationsFragment;
 import com.fastaccess.ui.modules.notification.unread.UnreadNotificationsFragment;
+import com.fastaccess.ui.modules.pinned.gist.PinnedGistFragment;
 import com.fastaccess.ui.modules.pinned.issue.PinnedIssueFragment;
 import com.fastaccess.ui.modules.pinned.pullrequest.PinnedPullRequestFragment;
 import com.fastaccess.ui.modules.pinned.repo.PinnedReposFragment;
@@ -172,14 +177,15 @@ import lombok.Setter;
 
     @NonNull public static List<FragmentPagerAdapterModel> buildForNotifications(@NonNull Context context) {
         return Stream.of(new FragmentPagerAdapterModel(context.getString(R.string.unread), new UnreadNotificationsFragment()),
-                new FragmentPagerAdapterModel(context.getString(R.string.all), AllNotificationsFragment.newInstance()))
+                new FragmentPagerAdapterModel(context.getString(R.string.all), AllNotificationsFragment.newInstance()),
+                new FragmentPagerAdapterModel(context.getString(R.string.app_name), new FastHubNotificationsFragment()))
                 .collect(Collectors.toList());
     }
 
     @NonNull public static List<FragmentPagerAdapterModel> buildForGists(@NonNull Context context) {
-
-        return Stream.of(new FragmentPagerAdapterModel(context.getString(R.string.my_gists), ProfileGistsFragment.newInstance(Login.getUser()
-                        .getLogin())),
+        return Stream.of(new FragmentPagerAdapterModel(context.getString(R.string.my_gists), ProfileGistsFragment
+                        .newInstance(Login.getUser().getLogin())),
+                new FragmentPagerAdapterModel(context.getString(R.string.starred), StarredGistsFragment.newInstance()),
                 new FragmentPagerAdapterModel(context.getString(R.string.public_gists), GistsFragment.newInstance()))
                 .collect(Collectors.toList());
     }
@@ -259,12 +265,18 @@ import lombok.Setter;
                 .toList();
     }
 
-
     @NonNull public static List<FragmentPagerAdapterModel> buildForPinned(@NonNull Context context) {
         return Stream.of(new FragmentPagerAdapterModel(context.getString(R.string.repos), PinnedReposFragment.newInstance()),
                 new FragmentPagerAdapterModel(context.getString(R.string.issues), PinnedIssueFragment.newInstance()),
-                new FragmentPagerAdapterModel(context.getString(R.string.pull_requests), PinnedPullRequestFragment.newInstance()))
+                new FragmentPagerAdapterModel(context.getString(R.string.pull_requests), PinnedPullRequestFragment.newInstance()),
+                new FragmentPagerAdapterModel(context.getString(R.string.gists), PinnedGistFragment.newInstance()))
                 .collect(Collectors.toList());
+    }
+
+    @NonNull public static List<FragmentPagerAdapterModel> buildForDrawer(@NonNull Context context) {
+        return Stream.of(new FragmentPagerAdapterModel(context.getString(R.string.menu_label), new MainDrawerFragment()),
+                new FragmentPagerAdapterModel(context.getString(R.string.profile), new AccountDrawerFragment()))
+                .toList();
     }
 
     @Override public boolean equals(Object o) {

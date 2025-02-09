@@ -4,8 +4,8 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.support.v4.app.Fragment
-import android.support.v4.widget.SwipeRefreshLayout
+import androidx.fragment.app.Fragment
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -108,10 +108,7 @@ class FullScreenFileChangeActivity : BaseActivity<FullScreenFileChangeMvp.View, 
     override fun onOptionsItemSelected(item: MenuItem?): Boolean {
         return when (item?.itemId) {
             R.id.submit -> {
-                val intent = Intent()
-                intent.putExtras(Bundler.start().putParcelableArrayList(BundleConstant.ITEM, commentList).end())
-                setResult(Activity.RESULT_OK, intent)
-                finish()
+                sendResult()
                 true
             }
             else -> super.onOptionsItemSelected(item)
@@ -151,16 +148,28 @@ class FullScreenFileChangeActivity : BaseActivity<FullScreenFileChangeMvp.View, 
                 current.isHasCommentedOn = true
                 adapter.swapItem(current, childPosition)
             }
+            if (presenter.isCommit) {
+                sendResult()
+            }
         }
     }
 
+    private fun sendResult() {
+        val intent = Intent()
+        intent.putExtras(Bundler.start().putParcelableArrayList(BundleConstant.ITEM, commentList).end())
+        setResult(Activity.RESULT_OK, intent)
+        finish()
+    }
+
+
     companion object {
         val FOR_RESULT_CODE = 1002
-        fun startActivityForResult(fragment: Fragment, model: CommitFileChanges, position: Int) {
+        fun startActivityForResult(fragment: Fragment, model: CommitFileChanges, position: Int, isCommit: Boolean = false) {
             val intent = Intent(fragment.context, FullScreenFileChangeActivity::class.java)
             intent.putExtras(Bundler.start()
                     .put(BundleConstant.EXTRA, model)
                     .put(BundleConstant.ITEM, position)
+                    .put(BundleConstant.YES_NO_EXTRA, isCommit)
                     .end())
             fragment.startActivityForResult(intent, FOR_RESULT_CODE)
         }

@@ -7,12 +7,12 @@ import android.graphics.Color;
 import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.design.widget.FloatingActionButton;
-import android.support.transition.TransitionManager;
-import android.support.v4.widget.TextViewCompat;
-import android.support.v7.widget.RecyclerView;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import androidx.transition.TransitionManager;
+import androidx.core.widget.TextViewCompat;
+import androidx.recyclerview.widget.RecyclerView;
 import android.text.format.Formatter;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -45,7 +45,10 @@ import com.fastaccess.ui.adapter.TopicsAdapter;
 import com.fastaccess.ui.base.BaseActivity;
 import com.fastaccess.ui.modules.filter.issues.FilterIssuesActivity;
 import com.fastaccess.ui.modules.main.MainActivity;
+import com.fastaccess.ui.modules.repos.code.RepoCodePagerFragment;
+import com.fastaccess.ui.modules.repos.extras.labels.LabelsDialogFragment;
 import com.fastaccess.ui.modules.repos.extras.license.RepoLicenseBottomSheet;
+import com.fastaccess.ui.modules.repos.extras.milestone.create.MilestoneDialogFragment;
 import com.fastaccess.ui.modules.repos.extras.misc.RepoMiscDialogFragment;
 import com.fastaccess.ui.modules.repos.extras.misc.RepoMiscMVp;
 import com.fastaccess.ui.modules.repos.issues.RepoIssuesPagerFragment;
@@ -366,6 +369,14 @@ public class RepoPagerActivity extends BaseActivity<RepoPagerMvp.View, RepoPager
             case 3:
                 onLongClick(forkRepoLayout);
                 break;
+            case 4:
+                MilestoneDialogFragment.newInstance(login, repoId)
+                        .show(getSupportFragmentManager(), "MilestoneDialogFragment");
+                break;
+            case 5:
+                LabelsDialogFragment.newInstance(null, repoId, login)
+                        .show(getSupportFragmentManager(), "LabelsDialogFragment");
+                break;
         }
         showWhich = -1;
         setTaskName(getPresenter().getRepo().getFullName());
@@ -568,19 +579,18 @@ public class RepoPagerActivity extends BaseActivity<RepoPagerMvp.View, RepoPager
     }
 
     @Override public void onBackPressed() {
-//        if (navType == RepoPagerMvp.CODE) {
-//            RepoCodePagerFragment codePagerView = (RepoCodePagerFragment) AppHelper.getFragmentByTag(getSupportFragmentManager(),
-//                    RepoCodePagerFragment.TAG);
-//            if (codePagerView != null) {
-//                if (codePagerView.canPressBack()) {
-//                    super.onBackPressed();
-//                } else {
-//                    codePagerView.onBackPressed();
-//                    return;
-//                }
-//            }
-//        } else
-        if (navType == RepoPagerMvp.ISSUES && filterLayout.isShown()) {
+        if (navType == RepoPagerMvp.CODE) {
+            RepoCodePagerFragment codePagerView = (RepoCodePagerFragment) AppHelper.getFragmentByTag(getSupportFragmentManager(),
+                    RepoCodePagerFragment.TAG);
+            if (codePagerView != null) {
+                if (codePagerView.canPressBack()) {
+                    super.onBackPressed();
+                } else {
+                    codePagerView.onBackPressed();
+                    return;
+                }
+            }
+        } else if (navType == RepoPagerMvp.ISSUES && filterLayout.isShown()) {
             hideFilterLayout();
             return;
         }

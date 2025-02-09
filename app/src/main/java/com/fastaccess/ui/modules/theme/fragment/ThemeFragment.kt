@@ -5,8 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
-import android.support.design.widget.FloatingActionButton
-import android.support.v7.widget.Toolbar
+import com.google.android.material.floatingactionbutton.FloatingActionButton
+import androidx.appcompat.widget.Toolbar
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
 import android.view.View
@@ -37,7 +37,7 @@ class ThemeFragment : BaseFragment<ThemeFragmentMvp.View, ThemeFragmentPresenter
     private var theme: Int = 0
     private var themeListener: ThemeFragmentMvp.ThemeListener? = null
 
-    override fun onAttach(context: Context?) {
+    override fun onAttach(context: Context) {
         super.onAttach(context)
         themeListener = context as ThemeFragmentMvp.ThemeListener
     }
@@ -56,12 +56,12 @@ class ThemeFragment : BaseFragment<ThemeFragmentMvp.View, ThemeFragmentPresenter
         if (isPremiumTheme()) {
             toolbar.title = SpannableBuilder.builder().foreground(getString(R.string.premium_theme), Color.RED)
         }
-        toolbar.setNavigationOnClickListener { activity.onBackPressed() }
+        toolbar.setNavigationOnClickListener { activity?.onBackPressed() }
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         super.onCreateView(inflater, container, savedInstanceState)
-        theme = arguments.getInt(BundleConstant.ITEM)
+        theme = arguments!!.getInt(BundleConstant.ITEM)
         val contextThemeWrapper = ContextThemeWrapper(activity, theme)
         primaryDarkColor = ViewHelper.getPrimaryDarkColor(contextThemeWrapper)
         val localInflater = inflater.cloneInContext(contextThemeWrapper)
@@ -140,7 +140,7 @@ class ThemeFragment : BaseFragment<ThemeFragmentMvp.View, ThemeFragmentPresenter
         if (PrefGetter.isProEnabled() || PrefGetter.isAllFeaturesUnlocked()) {
             setTheme(getString(R.string.mid_night_blue_theme_mode))
         } else {
-            PremiumActivity.startActivity(context)
+            PremiumActivity.startActivity(context!!)
         }
     }
 
@@ -152,7 +152,7 @@ class ThemeFragment : BaseFragment<ThemeFragmentMvp.View, ThemeFragmentPresenter
     private fun isPremiumTheme(): Boolean = theme != R.style.ThemeLight && theme != R.style.ThemeDark
 
     private fun isGoogleSupported(): Boolean {
-        if (AppHelper.isGoogleAvailable(context)) {
+        if (AppHelper.isGoogleAvailable(context!!)) {
             return true
         }
         showErrorMessage(getString(R.string.common_google_play_services_unsupported_text))

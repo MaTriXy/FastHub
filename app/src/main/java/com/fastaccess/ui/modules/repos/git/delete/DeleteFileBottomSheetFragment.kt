@@ -2,7 +2,7 @@ package com.fastaccess.ui.modules.repos.git.delete
 
 import android.content.Context
 import android.os.Bundle
-import android.support.design.widget.TextInputLayout
+import com.google.android.material.textfield.TextInputLayout
 import android.view.View
 import butterknife.BindView
 import butterknife.OnClick
@@ -37,7 +37,7 @@ class DeleteFileBottomSheetFragment : BaseBottomSheetDialog() {
     @OnClick(R.id.cancel)
     fun onCancel() = dismiss()
 
-    override fun onAttach(context: Context?) {
+    override fun onAttach(context: Context) {
         super.onAttach(context)
         if (parentFragment is DeleteContentFileCallback) {
             deleteCallback = parentFragment as DeleteContentFileCallback
@@ -56,7 +56,7 @@ class DeleteFileBottomSheetFragment : BaseBottomSheetDialog() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         fileName.isEnabled = false
-        fileName.editText?.setText(arguments.getString(BundleConstant.ITEM))
+        fileName.editText?.setText(arguments?.getString(BundleConstant.ITEM))
     }
 
     companion object {

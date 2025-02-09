@@ -3,8 +3,8 @@ package com.fastaccess.helper;
 import android.annotation.SuppressLint;
 import android.content.SharedPreferences;
 import android.preference.PreferenceManager;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.fastaccess.App;
 
@@ -58,7 +58,8 @@ public class PrefHelper {
     }
 
     public static int getInt(@NonNull String key) {
-        return PreferenceManager.getDefaultSharedPreferences(App.getInstance()).getInt(key, 0);
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(App.getInstance());
+        return preferences.getAll().get(key) instanceof Integer ? preferences.getInt(key, 0) : -1;
     }
 
     public static long getLong(@NonNull String key) {

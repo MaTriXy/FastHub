@@ -1,10 +1,10 @@
 package com.fastaccess.ui.modules.repos;
 
-import android.support.annotation.IdRes;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentManager;
+import androidx.annotation.IdRes;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentManager;
 
 import com.fastaccess.R;
 import com.fastaccess.data.dao.model.AbstractPinnedRepos;
@@ -15,6 +15,7 @@ import com.fastaccess.helper.AppHelper;
 import com.fastaccess.helper.InputHelper;
 import com.fastaccess.helper.RxHelper;
 import com.fastaccess.provider.rest.RestProvider;
+import com.fastaccess.ui.base.mvp.BaseMvp;
 import com.fastaccess.ui.base.mvp.presenter.BasePresenter;
 import com.fastaccess.ui.modules.repos.code.RepoCodePagerFragment;
 import com.fastaccess.ui.modules.repos.issues.RepoIssuesPagerFragment;
@@ -63,7 +64,7 @@ class RepoPagerPresenter extends BasePresenter<RepoPagerMvp.View> implements Rep
     @Override public void onError(@NonNull Throwable throwable) {
         int code = RestProvider.getErrorCode(throwable);
         if (code == 404) {
-            sendToView(RepoPagerMvp.View::onFinishActivity);
+            sendToView(BaseMvp.FAView::onOpenUrlInBrowser);
         } else {
             onWorkOffline();
         }

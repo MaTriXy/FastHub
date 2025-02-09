@@ -2,8 +2,8 @@ package com.fastaccess.ui.modules.reviews.changes
 
 import android.content.Context
 import android.os.Bundle
-import android.support.v4.content.ContextCompat
-import android.support.v7.widget.Toolbar
+import androidx.core.content.ContextCompat
+import androidx.appcompat.widget.Toolbar
 import android.view.View
 import android.widget.Spinner
 import butterknife.BindView
@@ -37,7 +37,7 @@ class ReviewChangesActivity : BaseDialogFragment<ReviewChangesMvp.View, ReviewCh
         childFragmentManager.findFragmentByTag("commentContainer") as CommentEditorFragment?
     }
 
-    override fun onAttach(context: Context?) {
+    override fun onAttach(context: Context) {
         super.onAttach(context)
         if (parentFragment is ReviewChangesMvp.ReviewSubmissionCallback) {
             subimssionCallback = parentFragment as ReviewChangesMvp.ReviewSubmissionCallback
@@ -70,7 +70,7 @@ class ReviewChangesActivity : BaseDialogFragment<ReviewChangesMvp.View, ReviewCh
             isClosed = bundle.getBoolean(BundleConstant.EXTRA_FIVE)
             isAuthor = bundle.getBoolean(BundleConstant.EXTRA_FOUR)
         }
-        toolbar.navigationIcon = ContextCompat.getDrawable(context, R.drawable.ic_clear)
+        toolbar.navigationIcon = ContextCompat.getDrawable(context!!, R.drawable.ic_clear)
         toolbar.inflateMenu(R.menu.done_menu)
         toolbar.setNavigationOnClickListener { dismiss() }
         toolbar.setOnMenuItemClickListener {
@@ -122,11 +122,7 @@ class ReviewChangesActivity : BaseDialogFragment<ReviewChangesMvp.View, ReviewCh
     override fun onTagUser(username: String) {}
 
     override fun onClearEditText() {
-        commentEditorFragment?.let {
-            it.commentText.let {
-                it.text = null
-            }
-        }
+        commentEditorFragment?.commentText?.setText("")
     }
 
     override fun getNamesToTag(): ArrayList<String>? {

@@ -3,14 +3,14 @@ package com.fastaccess.ui.modules.repos.pull_requests.pull_request.details;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.TabLayout;
-import android.support.v4.app.Fragment;
-import android.support.v4.content.ContextCompat;
-import android.support.v4.view.ViewPager;
-import android.support.v7.widget.CardView;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.tabs.TabLayout;
+import androidx.fragment.app.Fragment;
+import androidx.core.content.ContextCompat;
+import androidx.viewpager.widget.ViewPager;
+import androidx.cardview.widget.CardView;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -34,7 +34,6 @@ import com.fastaccess.helper.Bundler;
 import com.fastaccess.helper.InputHelper;
 import com.fastaccess.helper.Logger;
 import com.fastaccess.helper.PrefGetter;
-import com.fastaccess.helper.ViewHelper;
 import com.fastaccess.provider.scheme.LinkParserHelper;
 import com.fastaccess.ui.adapter.FragmentsPagerAdapter;
 import com.fastaccess.ui.base.BaseActivity;
@@ -45,6 +44,7 @@ import com.fastaccess.ui.modules.repos.RepoPagerActivity;
 import com.fastaccess.ui.modules.repos.RepoPagerMvp;
 import com.fastaccess.ui.modules.repos.extras.assignees.AssigneesDialogFragment;
 import com.fastaccess.ui.modules.repos.extras.labels.LabelsDialogFragment;
+import com.fastaccess.ui.modules.repos.extras.locking.LockIssuePrBottomSheetDialog;
 import com.fastaccess.ui.modules.repos.extras.milestone.create.MilestoneDialogFragment;
 import com.fastaccess.ui.modules.repos.issues.create.CreateIssueActivity;
 import com.fastaccess.ui.modules.repos.pull_requests.pull_request.details.files.PullRequestFilesFragment;
@@ -206,13 +206,17 @@ public class PullRequestPagerActivity extends BaseActivity<PullRequestPagerMvp.V
                     .show(getSupportFragmentManager(), MessageDialogView.TAG);
             return true;
         } else if (item.getItemId() == R.id.lockIssue) {
-            MessageDialogView.newInstance(
-                    getPresenter().isLocked() ? getString(R.string.unlock_issue) : getString(R.string.lock_issue),
-                    getPresenter().isLocked() ? getString(R.string.unlock_issue_details) : getString(R.string.lock_issue_details),
-                    Bundler.start().put(BundleConstant.EXTRA_TWO, true)
-                            .put(BundleConstant.YES_NO_EXTRA, true)
-                            .end())
-                    .show(getSupportFragmentManager(), MessageDialogView.TAG);
+            if (!getPresenter().isLocked()) {
+                LockIssuePrBottomSheetDialog.Companion
+                        .newInstance()
+                        .show(getSupportFragmentManager(), MessageDialogView.TAG);
+            } else {
+                MessageDialogView.newInstance(getString(R.string.unlock_issue), getString(R.string.unlock_issue_details),
+                        Bundler.start().put(BundleConstant.EXTRA_TWO, true)
+                                .put(BundleConstant.YES_NO_EXTRA, true)
+                                .end())
+                        .show(getSupportFragmentManager(), MessageDialogView.TAG);
+            }
             return true;
         } else if (item.getItemId() == R.id.labels) {
             LabelsDialogFragment.newInstance(getPresenter().getPullRequest() != null ? getPresenter().getPullRequest().getLabels() : null,
@@ -294,7 +298,7 @@ public class PullRequestPagerActivity extends BaseActivity<PullRequestPagerMvp.V
             pinUnpin.setIcon(isPinned ? ContextCompat.getDrawable(this, R.drawable.ic_pin_filled)
                                       : ContextCompat.getDrawable(this, R.drawable.ic_pin));
             closeIssue.setVisible(isRepoOwner || (isOwner || isCollaborator) && getPresenter().getPullRequest().getState() == IssueState.open);
-            lockIssue.setVisible(isRepoOwner || (isOwner || isCollaborator) && getPresenter().getPullRequest().getState() == IssueState.open);
+            lockIssue.setVisible(isRepoOwner || isCollaborator && getPresenter().getPullRequest().getState() == IssueState.open);
             closeIssue.setTitle(getPresenter().getPullRequest().getState() == IssueState.closed ? getString(R.string.re_open) : getString(R.string
                     .close));
             lockIssue.setTitle(isLocked ? getString(R.string.unlock_issue) : getString(R.string.lock_issue));
@@ -426,7 +430,7 @@ public class PullRequestPagerActivity extends BaseActivity<PullRequestPagerMvp.V
         getPresenter().onMerge(msg, mergeMethod);
     }
 
-    @Override protected void onNavToRepoClicked() {
+    @Override public void onNavToRepoClicked() {
         Intent intent = ActivityHelper.editBundle(RepoPagerActivity.createIntent(this, getPresenter().getRepoId(),
                 getPresenter().getLogin(), RepoPagerMvp.PULL_REQUEST), isEnterprise());
         startActivity(intent);
@@ -478,7 +482,7 @@ public class PullRequestPagerActivity extends BaseActivity<PullRequestPagerMvp.V
     }
 
     @SuppressWarnings("ConstantConditions") @Override public void onClearEditText() {
-        if (commentEditorFragment != null && commentEditorFragment.commentText != null) commentEditorFragment.commentText.setText(null);
+        if (commentEditorFragment != null && commentEditorFragment.commentText != null) commentEditorFragment.commentText.setText("");
     }
 
     @Override public ArrayList<String> getNamesToTag() {
@@ -487,6 +491,10 @@ public class PullRequestPagerActivity extends BaseActivity<PullRequestPagerMvp.V
             return fragment.getNamesToTag();
         }
         return new ArrayList<>();
+    }
+
+    @Override public void onLock(String reason) {
+        getPresenter().onLockUnlockConversations(reason);
     }
 
     protected void hideAndClearReviews() {
@@ -503,13 +511,14 @@ public class PullRequestPagerActivity extends BaseActivity<PullRequestPagerMvp.V
     private void addPrReview(@NonNull View view) {
         PullRequest pullRequest = getPresenter().getPullRequest();
         if (pullRequest == null) return;
-        User author = pullRequest.getHead().getAuthor() != null ? pullRequest.getHead().getAuthor() :
-                      pullRequest.getHead().getUser() != null ? pullRequest.getHead().getUser() : pullRequest.getUser(); // fallback to user object
+        User author = pullRequest.getUser() != null ? pullRequest.getUser() :
+                      pullRequest.getHead() != null && pullRequest.getHead().getAuthor() != null ?
+                      pullRequest.getHead().getAuthor() : pullRequest.getUser();
+        if (author == null) return;
         ReviewRequestModel requestModel = new ReviewRequestModel();
         requestModel.setComments(getPresenter().getCommitComment().isEmpty() ? null : getPresenter().getCommitComment());
         requestModel.setCommitId(pullRequest.getHead().getSha());
-        boolean isAuthor = author != null && Login.getUser().getLogin().equalsIgnoreCase(author.getLogin());
-
+        boolean isAuthor = Login.getUser().getLogin().equalsIgnoreCase(author.getLogin());
         ReviewChangesActivity.Companion.startForResult(requestModel, getPresenter().getRepoId(),
                 getPresenter().getLogin(), pullRequest.getNumber(), isAuthor, isEnterprise(), pullRequest.isMerged()
                         || pullRequest.getState() == IssueState.closed)
@@ -561,11 +570,11 @@ public class PullRequestPagerActivity extends BaseActivity<PullRequestPagerMvp.V
         } else {
             title.setText(SpannableBuilder.builder().append(pullRequest.getTitle()));
         }
-        detailsIcon.setVisibility(InputHelper.isEmpty(pullRequest.getTitle()) || !ViewHelper.isEllipsed(title) ? View.GONE : View.VISIBLE);
+        detailsIcon.setVisibility(View.VISIBLE);
     }
 
     private void hideShowFab() {
-        if (getPresenter().isLocked() && !getPresenter().isOwner()) {
+        if (getPresenter().isLocked() && !getPresenter().isOwner() && !getPresenter().isCollaborator()) {
             getSupportFragmentManager().beginTransaction()
                     .setCustomAnimations(android.R.anim.fade_in, android.R.anim.fade_out)
                     .hide(commentEditorFragment).commit();

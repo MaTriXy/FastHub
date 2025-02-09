@@ -6,6 +6,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:focusableInTouchMode="true"
     android:orientation="vertical">
 
     <LinearLayout
@@ -20,7 +21,7 @@
             android:paddingBottom="@dimen/spacing_normal"
             android:paddingTop="@dimen/spacing_normal">
 
-            <android.support.v7.widget.AppCompatImageView
+            <androidx.appcompat.widget.AppCompatImageView
                 android:id="@+id/close"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -65,7 +66,7 @@
                         android:paddingBottom="@dimen/spacing_micro"
                         android:paddingTop="@dimen/spacing_micro">
 
-                        <android.support.v7.widget.AppCompatImageView
+                        <androidx.appcompat.widget.AppCompatImageView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_gravity="start|center"
@@ -88,6 +89,7 @@
                                 android:textColor="@color/search_tab_highlighter"/>
 
                             <com.fastaccess.ui.widgets.FontTextView
+                                android:id="@+id/enterprisePrice"
                                 style="@style/Base.TextAppearance.AppCompat.Subhead"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
@@ -131,7 +133,7 @@
                         android:paddingBottom="@dimen/spacing_micro"
                         android:paddingTop="@dimen/spacing_micro">
 
-                        <android.support.v7.widget.AppCompatImageView
+                        <androidx.appcompat.widget.AppCompatImageView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_gravity="start|center"
@@ -154,6 +156,7 @@
                                 android:textColor="@color/search_tab_highlighter"/>
 
                             <com.fastaccess.ui.widgets.FontTextView
+                                android:id="@+id/proPrice"
                                 style="@style/Base.TextAppearance.AppCompat.Subhead"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
@@ -195,7 +198,7 @@
                         android:paddingBottom="@dimen/spacing_micro"
                         android:paddingTop="@dimen/spacing_micro">
 
-                        <android.support.v7.widget.AppCompatImageView
+                        <androidx.appcompat.widget.AppCompatImageView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_gravity="start|center"

@@ -1,10 +1,10 @@
 package com.fastaccess.ui.widgets.recyclerview;
 
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.v7.widget.GridLayoutManager;
-import android.support.v7.widget.RecyclerView;
-import android.support.v7.widget.StaggeredGridLayoutManager;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.recyclerview.widget.GridLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
+import androidx.recyclerview.widget.StaggeredGridLayoutManager;
 import android.view.View;
 import android.view.ViewGroup;
 
@@ -61,8 +61,7 @@ public abstract class BaseRecyclerAdapter<M, VH extends BaseViewHolder,
     }
 
     public M getItem(int position) {
-        if (position < data.size()) return data.get(position);
-        return null;
+        return data.get(position);
     }
 
     public int getItem(M t) {

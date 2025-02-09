@@ -23,42 +23,47 @@ class ProjectPagerPresenter : BasePresenter<ProjectPagerMvp.View>(), ProjectPage
     @com.evernote.android.state.State var login: String = ""
     @com.evernote.android.state.State var viewerCanUpdate: Boolean = false
 
-    override fun getColumns(): ArrayList<ProjectColumnModel> = columns
+    override fun onError(throwable: Throwable) {
+        val code = RestProvider.getErrorCode(throwable)
+        if (code == 404) {
+            sendToView { it.onOpenUrlInBrowser() }
+        }
+        super.onError(throwable)
+    }
 
+    override fun getColumns(): ArrayList<ProjectColumnModel> = columns
 
     override fun onRetrieveColumns() {
         val repoId = repoId
         if (repoId != null && !repoId.isNullOrBlank()) {
             makeRestCall(Observable.zip(RestProvider.getProjectsService(isEnterprise).getProjectColumns(projectId),
-                    RestProvider.getRepoService(isEnterprise).isCollaborator(login, repoId, Login.getUser().login),
-                    BiFunction { items: Pageable<ProjectColumnModel>, response: Response<Boolean> ->
-                        viewerCanUpdate = response.code() == 204
-                        return@BiFunction items
-                    })
-                    .flatMap {
-                        if (it.items != null) {
-                            return@flatMap Observable.just(it.items)
-                        }
-                        return@flatMap Observable.just(listOf<ProjectColumnModel>())
-                    },
-                    { t ->
-                        columns.clear()
-                        columns.addAll(t)
-                        sendToView { it.onInitPager(columns) }
-                    })
+                RestProvider.getRepoService(isEnterprise).isCollaborator(login, repoId, Login.getUser().login),
+                BiFunction { items: Pageable<ProjectColumnModel>, response: Response<Boolean> ->
+                    viewerCanUpdate = response.code() == 204
+                    return@BiFunction items
+                })
+                .flatMap {
+                    if (it.items != null) {
+                        return@flatMap Observable.just(it.items)
+                    }
+                    return@flatMap Observable.just(listOf<ProjectColumnModel>())
+                }) { t ->
+                columns.clear()
+                columns.addAll(t)
+                sendToView { it.onInitPager(columns) }
+            }
         } else {
             makeRestCall(RestProvider.getProjectsService(isEnterprise).getProjectColumns(projectId)
-                    .flatMap {
-                        if (it.items != null) {
-                            return@flatMap Observable.just(it.items)
-                        }
-                        return@flatMap Observable.just(listOf<ProjectColumnModel>())
-                    },
-                    { t ->
-                        columns.clear()
-                        columns.addAll(t)
-                        sendToView { it.onInitPager(columns) }
-                    })
+                .flatMap {
+                    if (it.items != null) {
+                        return@flatMap Observable.just(it.items)
+                    }
+                    return@flatMap Observable.just(listOf<ProjectColumnModel>())
+                }) { t ->
+                columns.clear()
+                columns.addAll(t)
+                sendToView { it.onInitPager(columns) }
+            }
         }
     }
 
@@ -67,7 +72,7 @@ class ProjectPagerPresenter : BasePresenter<ProjectPagerMvp.View>(), ProjectPage
             it.extras?.let {
                 projectId = it.getLong(BundleConstant.ID)
                 repoId = it.getString(BundleConstant.ITEM)
-                login = it.getString(BundleConstant.EXTRA)
+                login = it.getString(BundleConstant.EXTRA) ?: ""
             }
         }
         if (columns.isEmpty()) {

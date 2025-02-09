@@ -6,11 +6,11 @@ import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.TabLayout;
-import android.support.v4.app.Fragment;
-import android.support.v4.view.ViewPager;
+import androidx.annotation.NonNull;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.tabs.TabLayout;
+import androidx.fragment.app.Fragment;
+import androidx.viewpager.widget.ViewPager;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.TextView;
@@ -25,6 +25,7 @@ import com.fastaccess.helper.ActivityHelper;
 import com.fastaccess.helper.BundleConstant;
 import com.fastaccess.helper.Bundler;
 import com.fastaccess.helper.InputHelper;
+import com.fastaccess.helper.Logger;
 import com.fastaccess.helper.ViewHelper;
 import com.fastaccess.provider.scheme.LinkParserHelper;
 import com.fastaccess.ui.adapter.FragmentsPagerAdapter;
@@ -33,7 +34,6 @@ import com.fastaccess.ui.base.BaseFragment;
 import com.fastaccess.ui.modules.main.MainActivity;
 import com.fastaccess.ui.modules.profile.org.repos.OrgReposFragment;
 import com.fastaccess.ui.modules.profile.repos.ProfileReposFragment;
-import com.fastaccess.ui.modules.search.SearchUserActivity;
 import com.fastaccess.ui.widgets.SpannableBuilder;
 import com.fastaccess.ui.widgets.ViewPagerView;
 
@@ -118,8 +118,12 @@ public class UserPagerActivity extends BaseActivity<UserPagerMvp.View, UserPager
                 login = getIntent().getExtras().getString(BundleConstant.EXTRA);
                 isOrg = getIntent().getExtras().getBoolean(BundleConstant.EXTRA_TYPE);
                 index = getIntent().getExtras().getInt(BundleConstant.EXTRA_TWO, -1);
-                if (!InputHelper.isEmpty(login) && isOrg) {
-                    getPresenter().checkOrgMembership(login);
+                if (!InputHelper.isEmpty(login)) {
+                    if (isOrg) {
+                        getPresenter().checkOrgMembership(login);
+                    } else {
+                        if (!Login.getUser().getLogin().equalsIgnoreCase(login)) getPresenter().onCheckBlocking(login);
+                    }
                 }
             } else {
                 Login user = Login.getUser();
@@ -209,6 +213,21 @@ public class UserPagerActivity extends BaseActivity<UserPagerMvp.View, UserPager
         setTaskName(login);
     }
 
+    @Override public void onUserBlocked() {
+        showMessage(R.string.success, R.string.user_blocked);
+        onInvalidateMenu();
+    }
+
+    @Override public void onInvalidateMenu() {
+        hideProgress();
+        supportInvalidateOptionsMenu();
+    }
+
+    @Override public void onUserUnBlocked() {
+        showMessage(R.string.success, R.string.user_unblocked);
+        onInvalidateMenu();
+    }
+
     @Override public void onCheckType(boolean isOrg) {
         if (!this.isOrg == isOrg) {
             startActivity(this, login, isOrg, isEnterprise(), index);
@@ -254,8 +273,27 @@ public class UserPagerActivity extends BaseActivity<UserPagerMvp.View, UserPager
                     .appendPath(login)
                     .toString());
             return true;
+        } else if (item.getItemId() == R.id.block && !InputHelper.isEmpty(login)) {
+            getPresenter().onBlockUser(login);
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override public boolean onPrepareOptionsMenu(Menu menu) {
+        Logger.e(getPresenter().isUserBlockedRequested(), getPresenter().isUserBlocked());
+        if (getPresenter().isUserBlockedRequested()) {
+            Login login = Login.getUser();
+            if (login != null && !isOrg) {
+                String username = login.getLogin();
+                if (!username.equalsIgnoreCase(this.login)) {
+                    menu.findItem(R.id.block)
+                            .setIcon(getPresenter().isUserBlocked() ? R.drawable.ic_unlock : R.drawable.ic_lock)
+                            .setTitle(getPresenter().isUserBlocked() ? getString(R.string.unblock) : getString(R.string.block))
+                            .setVisible(true);
+                }
+            }
+        }
+        return super.onPrepareOptionsMenu(menu);
     }
 
     private void hideShowFab(int position) {

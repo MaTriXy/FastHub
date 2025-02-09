@@ -3,12 +3,13 @@ package com.fastaccess.ui.modules.gists.gist;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.design.widget.FloatingActionButton;
-import android.support.design.widget.TabLayout;
-import android.support.v4.app.Fragment;
-import android.support.v4.view.ViewPager;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.tabs.TabLayout;
+import androidx.fragment.app.Fragment;
+import androidx.core.content.ContextCompat;
+import androidx.viewpager.widget.ViewPager;
 import android.text.format.Formatter;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -18,6 +19,7 @@ import com.fastaccess.R;
 import com.fastaccess.data.dao.FragmentPagerAdapterModel;
 import com.fastaccess.data.dao.model.Gist;
 import com.fastaccess.data.dao.model.Login;
+import com.fastaccess.data.dao.model.PinnedGists;
 import com.fastaccess.helper.ActivityHelper;
 import com.fastaccess.helper.BundleConstant;
 import com.fastaccess.helper.Bundler;
@@ -64,6 +66,7 @@ public class GistActivity extends BaseActivity<GistMvp.View, GistPresenter>
     @BindView(R.id.forkGist) ForegroundImageView forkGist;
     @BindView(R.id.detailsIcon) View detailsIcon;
     @BindView(R.id.edit) View edit;
+    @BindView(R.id.pinUnpin) ForegroundImageView pinUnpin;
     private int accentColor;
     private int iconColor;
     private CommentEditorFragment commentEditorFragment;
@@ -108,6 +111,14 @@ public class GistActivity extends BaseActivity<GistMvp.View, GistPresenter>
     @OnClick(R.id.edit) void onEdit() {
         if (PrefGetter.isProEnabled() || PrefGetter.isAllFeaturesUnlocked()) {
             if (getPresenter().getGist() != null) CreateGistActivity.start(this, getPresenter().getGist());
+        } else {
+            PremiumActivity.Companion.startActivity(this);
+        }
+    }
+
+    @OnClick(R.id.pinUnpin) void pinUpin() {
+        if (PrefGetter.isProEnabled()) {
+            getPresenter().onPinUnpinGist();
         } else {
             PremiumActivity.Companion.startActivity(this);
         }
@@ -230,6 +241,7 @@ public class GistActivity extends BaseActivity<GistMvp.View, GistPresenter>
         if (gistsModel == null) {
             return;
         }
+        onUpdatePinIcon(gistsModel);
         String url = gistsModel.getOwner() != null ? gistsModel.getOwner().getAvatarUrl() :
                      gistsModel.getUser() != null ? gistsModel.getUser().getAvatarUrl() : "";
         String login = gistsModel.getOwner() != null ? gistsModel.getOwner().getLogin() :
@@ -265,6 +277,12 @@ public class GistActivity extends BaseActivity<GistMvp.View, GistPresenter>
         });
     }
 
+    @Override public void onUpdatePinIcon(@NonNull Gist gist) {
+        pinUnpin.setImageDrawable(PinnedGists.isPinned(gist.getGistId().hashCode())
+                                  ? ContextCompat.getDrawable(this, R.drawable.ic_pin_filled)
+                                  : ContextCompat.getDrawable(this, R.drawable.ic_pin));
+    }
+
     @Override public void onScrollTop(int index) {
         if (pager == null || pager.getAdapter() == null) return;
         Fragment fragment = (BaseFragment) pager.getAdapter().instantiateItem(pager, index);
@@ -289,7 +307,7 @@ public class GistActivity extends BaseActivity<GistMvp.View, GistPresenter>
     }
 
     @SuppressWarnings("ConstantConditions") @Override public void onClearEditText() {
-        if (commentEditorFragment != null && commentEditorFragment.commentText != null) commentEditorFragment.commentText.setText(null);
+        if (commentEditorFragment != null && commentEditorFragment.commentText != null) commentEditorFragment.commentText.setText("");
     }
 
     @NonNull @Override public ArrayList<String> getNamesToTag() {

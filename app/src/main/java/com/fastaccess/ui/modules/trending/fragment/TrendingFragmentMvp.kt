@@ -11,8 +11,9 @@ import com.fastaccess.ui.widgets.recyclerview.BaseViewHolder
 
 interface TrendingFragmentMvp {
     interface View : BaseMvp.FAView {
-        fun onNotifyAdapter(items: TrendingModel)
+        fun onNotifyAdapter(items: List<TrendingModel>)
         fun onSetQuery(lang: String, since: String)
+        fun clearAdapter()
     }
 
     interface Presenter : BaseViewHolder.OnItemClickListener<TrendingModel> {

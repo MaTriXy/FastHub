@@ -27,7 +27,7 @@ class EmojiBottomSheet : BaseMvpBottomSheetDialogFragment<EmojiMvp.View, EmojiPr
     var emojiCallback: EmojiMvp.EmojiCallback? = null
 
 
-    @OnTextChanged(value = R.id.editText, callback = OnTextChanged.Callback.AFTER_TEXT_CHANGED)
+    @OnTextChanged(value = [(R.id.editText)], callback = OnTextChanged.Callback.AFTER_TEXT_CHANGED)
     fun onTextChange(text: Editable) {
         adapter.filter.filter(text)
     }
@@ -65,7 +65,7 @@ class EmojiBottomSheet : BaseMvpBottomSheetDialogFragment<EmojiMvp.View, EmojiPr
 
     override fun onItemLongClick(position: Int, v: View?, item: Emoji?) {}
 
-    override fun onViewCreated(view: View?, savedInstanceState: Bundle?) {
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         recycler.adapter = adapter
         fastScroller.attachRecyclerView(recycler)

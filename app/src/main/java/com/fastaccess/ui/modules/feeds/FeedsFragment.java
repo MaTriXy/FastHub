@@ -4,10 +4,10 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Parcelable;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.annotation.StringRes;
-import android.support.v4.widget.SwipeRefreshLayout;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import android.view.View;
 
 import com.fastaccess.R;
@@ -38,8 +38,7 @@ import butterknife.BindView;
  * Created by Kosh on 11 Nov 2016, 12:36 PM
  */
 
-public class FeedsFragment extends BaseFragment<FeedsMvp.View, FeedsPresenter> implements
-        FeedsMvp.View {
+public class FeedsFragment extends BaseFragment<FeedsMvp.View, FeedsPresenter> implements FeedsMvp.View {
 
     public static final String TAG = FeedsFragment.class.getSimpleName();
 

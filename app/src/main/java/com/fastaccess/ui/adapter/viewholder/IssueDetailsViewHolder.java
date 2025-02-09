@@ -1,10 +1,10 @@
 package com.fastaccess.ui.adapter.viewholder;
 
 import android.graphics.Color;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.transition.ChangeBounds;
-import android.support.transition.TransitionManager;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.transition.ChangeBounds;
+import androidx.transition.TransitionManager;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
@@ -69,6 +69,10 @@ public class IssueDetailsViewHolder extends BaseViewHolder<TimelineModel> {
     @BindView(R.id.hurrayReaction) FontTextView hurrayReaction;
     @BindView(R.id.sadReaction) FontTextView sadReaction;
     @BindView(R.id.heartReaction) FontTextView heartReaction;
+    @BindView(R.id.rocketReaction) FontTextView rocketReaction;
+    @BindView(R.id.eyeReaction) FontTextView eyeReaction;
+    @BindView(R.id.rocket) FontTextView rocket;
+    @BindView(R.id.eyes) FontTextView eyes;
     private OnToggleView onToggleView;
     private ReactionsCallback reactionsCallback;
     private ViewGroup viewGroup;
@@ -113,6 +117,14 @@ public class IssueDetailsViewHolder extends BaseViewHolder<TimelineModel> {
         thumbsUpReaction.setOnLongClickListener(this);
         hurrayReaction.setOnLongClickListener(this);
         heartReaction.setOnLongClickListener(this);
+        rocketReaction.setOnLongClickListener(this);
+        rocketReaction.setOnClickListener(this);
+        rocket.setOnLongClickListener(this);
+        rocket.setOnClickListener(this);
+        eyeReaction.setOnLongClickListener(this);
+        eyeReaction.setOnClickListener(this);
+        eyes.setOnLongClickListener(this);
+        eyes.setOnClickListener(this);
     }
 
     public static IssueDetailsViewHolder newInstance(@NonNull ViewGroup viewGroup, @Nullable BaseRecyclerAdapter adapter,
@@ -187,6 +199,14 @@ public class IssueDetailsViewHolder extends BaseViewHolder<TimelineModel> {
                 case R.id.hurrayReaction:
                     reactionsModel.setHooray(!isReacted ? reactionsModel.getHooray() + 1 : reactionsModel.getHooray() - 1);
                     break;
+                case R.id.rocket:
+                case R.id.rocketReaction:
+                    reactionsModel.setRocket(!isReacted ? reactionsModel.getRocket() + 1 : reactionsModel.getRocket() - 1);
+                    break;
+                case R.id.eyes:
+                case R.id.eyeReaction:
+                    reactionsModel.setEyes(!isReacted ? reactionsModel.getEyes() + 1 : reactionsModel.getEyes() - 1);
+                    break;
             }
             if (pullRequest != null) {
                 pullRequest.setReactions(reactionsModel);
@@ -220,7 +240,7 @@ public class IssueDetailsViewHolder extends BaseViewHolder<TimelineModel> {
             owner.setVisibility(View.VISIBLE);
             owner.setText(R.string.owner);
         } else {
-            owner.setText(null);
+            owner.setText("");
             owner.setVisibility(View.GONE);
         }
         if (reactionsModel != null) {
@@ -253,50 +273,8 @@ public class IssueDetailsViewHolder extends BaseViewHolder<TimelineModel> {
     }
 
     private void appendEmojies(ReactionsModel reaction) {
-        SpannableBuilder spannableBuilder = SpannableBuilder.builder()
-                .append(CommentsHelper.getThumbsUp()).append(" ")
-                .append(String.valueOf(reaction.getPlusOne()))
-                .append("   ");
-        thumbsUp.setText(spannableBuilder);
-        thumbsUpReaction.setText(spannableBuilder);
-        spannableBuilder = SpannableBuilder.builder()
-                .append(CommentsHelper.getThumbsDown()).append(" ")
-                .append(String.valueOf(reaction.getMinusOne()))
-                .append("   ");
-        thumbsDown.setText(spannableBuilder);
-        thumbsDownReaction.setText(spannableBuilder);
-        spannableBuilder = SpannableBuilder.builder()
-                .append(CommentsHelper.getHooray()).append(" ")
-                .append(String.valueOf(reaction.getHooray()))
-                .append("   ");
-        hooray.setText(spannableBuilder);
-        hurrayReaction.setText(spannableBuilder);
-        spannableBuilder = SpannableBuilder.builder()
-                .append(CommentsHelper.getSad()).append(" ")
-                .append(String.valueOf(reaction.getConfused()))
-                .append("   ");
-        sad.setText(spannableBuilder);
-        sadReaction.setText(spannableBuilder);
-        spannableBuilder = SpannableBuilder.builder()
-                .append(CommentsHelper.getLaugh()).append(" ")
-                .append(String.valueOf(reaction.getLaugh()))
-                .append("   ");
-        laugh.setText(spannableBuilder);
-        laughReaction.setText(spannableBuilder);
-        spannableBuilder = SpannableBuilder.builder()
-                .append(CommentsHelper.getHeart()).append(" ")
-                .append(String.valueOf(reaction.getHeart()));
-        heart.setText(spannableBuilder);
-        heartReaction.setText(spannableBuilder);
-        if (reaction.getPlusOne() > 0 || reaction.getMinusOne() > 0
-                || reaction.getLaugh() > 0 || reaction.getHooray() > 0
-                || reaction.getConfused() > 0 || reaction.getHeart() > 0) {
-            reactionsList.setVisibility(View.VISIBLE);
-            reactionsList.setTag(true);
-        } else {
-            reactionsList.setTag(false);
-            reactionsList.setVisibility(View.GONE);
-        }
+        CommentsHelper.appendEmojies(reaction, thumbsUp, thumbsUpReaction, thumbsDown, thumbsDownReaction, hooray, hurrayReaction, sad,
+                sadReaction, laugh, laughReaction, heart, heartReaction, rocket, rocketReaction, eyes, eyeReaction, reactionsList);
     }
 
     private void onToggle(boolean expanded, boolean animate) {

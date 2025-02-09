@@ -5,8 +5,8 @@ import android.content.Context;
 import android.content.res.TypedArray;
 import android.net.Uri;
 import android.os.Build;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
@@ -107,6 +107,11 @@ public class PrettifyWebView extends NestedWebView {
         if (onContentChangedListener != null) {
             onContentChangedListener.onScrollChanged(t == 0, t);
         }
+    }
+
+    @Override protected void onDetachedFromWindow() {
+        onContentChangedListener = null;
+        super.onDetachedFromWindow();
     }
 
     private boolean hitLinkResult(WebView.HitTestResult result) {
